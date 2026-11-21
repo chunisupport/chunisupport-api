@@ -169,6 +169,35 @@ CREATE TABLE `courses` (
   KEY `idx_courses_class_deleted_idx` (`course_class_id`,`is_deleted`,`official_idx`),
   CONSTRAINT `fk_courses_course_class` FOREIGN KEY (`course_class_id`) REFERENCES `course_classes` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `course_tracks` (
+  `course_id` mediumint unsigned NOT NULL,
+  `track_no` tinyint unsigned NOT NULL,
+  `selection_type` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `filter` json DEFAULT NULL,
+  PRIMARY KEY (`course_id`,`track_no`),
+  CONSTRAINT `fk_course_tracks_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_course_tracks_track_no` CHECK ((`track_no` between 1 and 3)),
+  CONSTRAINT `chk_course_tracks_selection_type` CHECK ((`selection_type` in ('FIXED','RANDOM_FILTER','RANDOM_POOL'))),
+  CONSTRAINT `chk_course_tracks_filter` CHECK ((((`selection_type` = 'RANDOM_FILTER') and (`filter` is not null)) or ((`selection_type` <> 'RANDOM_FILTER') and (`filter` is null))))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `course_track_charts` (
+  `course_id` mediumint unsigned NOT NULL,
+  `track_no` tinyint unsigned NOT NULL,
+  `chart_id` mediumint unsigned NOT NULL,
+  PRIMARY KEY (`course_id`,`track_no`,`chart_id`),
+  KEY `idx_course_track_charts_chart_id` (`chart_id`),
+  CONSTRAINT `fk_course_track_charts_track` FOREIGN KEY (`course_id`,`track_no`) REFERENCES `course_tracks` (`course_id`,`track_no`) ON DELETE CASCADE,
+  CONSTRAINT `fk_course_track_charts_chart` FOREIGN KEY (`chart_id`) REFERENCES `charts` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `course_track_worldsend_charts` (
+  `course_id` mediumint unsigned NOT NULL,
+  `track_no` tinyint unsigned NOT NULL,
+  `worldsend_chart_id` mediumint unsigned NOT NULL,
+  PRIMARY KEY (`course_id`,`track_no`,`worldsend_chart_id`),
+  KEY `idx_course_track_worldsend_charts_chart_id` (`worldsend_chart_id`),
+  CONSTRAINT `fk_course_track_worldsend_charts_track` FOREIGN KEY (`course_id`,`track_no`) REFERENCES `course_tracks` (`course_id`,`track_no`) ON DELETE CASCADE,
+  CONSTRAINT `fk_course_track_worldsend_charts_chart` FOREIGN KEY (`worldsend_chart_id`) REFERENCES `worldsend_charts` (`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `difficulties` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
   `name` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL,

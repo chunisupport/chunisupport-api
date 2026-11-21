@@ -308,6 +308,7 @@ func registerInternalCourseRoutes(internal *echo.Group, handlers *Handlers, mw i
 	coursesGroup.Use(mw.firebaseAuthStrict)
 	coursesGroup.POST("", handlers.Course.Create, mw.requireAdmin)
 	coursesGroup.PUT("/:id", handlers.Course.Update, mw.requireEditor)
+	coursesGroup.PUT("/:id/tracks", handlers.Course.ReplaceTracks, mw.requireEditor)
 	coursesGroup.DELETE("/:id", handlers.Course.Delete, mw.requireAdmin)
 	coursesGroup.POST("/:id/restore", handlers.Course.Restore, mw.requireEditor)
 

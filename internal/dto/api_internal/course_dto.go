@@ -20,3 +20,14 @@ type UpdateCourseRequest struct {
 	Name  string `json:"name" validate:"required,max=255"`
 	Class string `json:"class" validate:"required,max=16"`
 }
+
+type ReplaceCourseTracksRequest struct {
+	Tracks []CourseTrackRequest `json:"tracks"`
+}
+
+type CourseTrackRequest struct {
+	Number        int                       `json:"track_no"`
+	SelectionType string                    `json:"selection_type"`
+	Filter        *dto.CourseTrackFilterDTO `json:"filter"`
+	Charts        []dto.CourseChartRefDTO   `json:"charts"`
+}

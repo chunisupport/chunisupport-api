@@ -24,7 +24,14 @@ type CourseOutput struct {
 	Idx, Name, Class string
 	IsDeleted        bool
 	UpdatedAt        *time.Time
+	Tracks           []CourseTrackOutput
 }
+
+type CourseTrackOutput struct {
+	entity.CourseTrack
+	Candidates []entity.CourseChartCandidate
+}
+
 type CourseRecordOutput struct {
 	DisplayID        string
 	Idx, Name, Class string
@@ -46,6 +53,7 @@ type CourseUsecase interface {
 	GetCoursesUpdatedAt(ctx context.Context) (*time.Time, error)
 	Create(ctx context.Context, input CreateCourseInput) (*CourseOutput, error)
 	Update(ctx context.Context, displayID string, input UpdateCourseInput) (*CourseOutput, error)
+	ReplaceTracks(ctx context.Context, displayID string, tracks []entity.CourseTrack) error
 	Delete(ctx context.Context, displayID string) error
 	Restore(ctx context.Context, displayID string) error
 	GetUserRecords(ctx context.Context, username string, requester *entity.User) (*CourseRecordResult, error)
@@ -65,13 +73,33 @@ func NewCourseUsecase(db repository.Executor, tm TransactionManager, repo reposi
 }
 
 func (u *courseUsecase) List(ctx context.Context, includeDeleted bool) ([]*CourseOutput, error) {
-	items, err := u.repo.FindAll(ctx, u.db, includeDeleted)
+	var result []*CourseOutput
+	err := u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		courses, err := u.repo.FindAll(ctx, tx, includeDeleted)
+		if err != nil {
+			return err
+		}
+		ids := make([]int, 0, len(courses))
+		for _, course := range courses {
+			ids = append(ids, course.ID)
+		}
+		tracks, err := u.repo.FindTracks(ctx, tx, ids)
+		if err != nil {
+			return err
+		}
+		result = make([]*CourseOutput, 0, len(courses))
+		for _, course := range courses {
+			if err := course.ReplaceTracks(tracks[course.ID]); err != nil {
+				return err
+			}
+			output := toCourseOutput(course, includeDeleted)
+			output.Tracks = toCourseTrackOutputs(course.Tracks, nil, false)
+			result = append(result, output)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
-	}
-	result := make([]*CourseOutput, 0, len(items))
-	for _, v := range items {
-		result = append(result, toCourseOutput(v, includeDeleted))
 	}
 	return result, nil
 }
@@ -82,14 +110,37 @@ func (u *courseUsecase) GetCoursesUpdatedAt(ctx context.Context) (*time.Time, er
 }
 
 func (u *courseUsecase) Get(ctx context.Context, displayID string, includeDeleted bool) (*CourseOutput, error) {
-	item, err := u.repo.FindByDisplayID(ctx, u.db, displayID, includeDeleted)
-	if errors.Is(err, repository.ErrCourseNotFound) {
-		return nil, ErrCourseNotFound
-	}
+	var output *CourseOutput
+	err := u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		course, err := u.repo.FindByDisplayID(ctx, tx, displayID, includeDeleted)
+		if errors.Is(err, repository.ErrCourseNotFound) {
+			return ErrCourseNotFound
+		}
+		if err != nil {
+			return err
+		}
+		tracks, err := u.repo.FindTracks(ctx, tx, []int{course.ID})
+		if err != nil {
+			return err
+		}
+		if err := course.ReplaceTracks(tracks[course.ID]); err != nil {
+			return err
+		}
+		var candidates map[int][]entity.CourseChartCandidate
+		if len(course.Tracks) > 0 {
+			candidates, err = u.repo.FindTrackCandidates(ctx, tx, course.ID, course.Tracks)
+			if err != nil {
+				return err
+			}
+		}
+		output = toCourseOutput(course, includeDeleted)
+		output.Tracks = toCourseTrackOutputs(course.Tracks, candidates, true)
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	return toCourseOutput(item, includeDeleted), nil
+	return output, nil
 }
 func (u *courseUsecase) Create(ctx context.Context, input CreateCourseInput) (*CourseOutput, error) {
 	idx := strings.TrimSpace(input.Idx)

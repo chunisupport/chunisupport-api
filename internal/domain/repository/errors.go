@@ -50,6 +50,8 @@ var (
 
 	// ErrCourseNotFound はコースが見つからない場合に返されるエラーです。
 	ErrCourseNotFound = errors.New("course not found")
+	// ErrInvalidCourseTracks はコース構成が楽曲・ジャンルマスタと整合しない場合に返します。
+	ErrInvalidCourseTracks = errors.New("invalid course tracks")
 
 	// ErrCourseClassNotFound はコースクラスが見つからない場合に返されるエラーです。
 	ErrCourseClassNotFound = errors.New("course class not found")

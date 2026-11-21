@@ -83,7 +83,7 @@ func toV1CourseDTO(value *usecase.CourseOutput) *api_v1.V1CourseDTO {
 	if value == nil {
 		return nil
 	}
-	return &api_v1.V1CourseDTO{DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class}
+	return &api_v1.V1CourseDTO{DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class, Tracks: handler.ToCourseTracksDTO(value.Tracks)}
 }
 func toV1CourseRecordDTOs(values []*usecase.CourseRecordOutput) []*api_v1.V1CourseRecordDTO {
 	result := make([]*api_v1.V1CourseRecordDTO, 0, len(values))
