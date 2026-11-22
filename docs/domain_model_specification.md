@@ -330,8 +330,8 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 | ID | int | ✓ | チームID（主キー。内部の参照専用でAPIには出さない） |
 | Code | teamcode.TeamCode | ✓ | チームコード（大文字英数字6桁、一意） |
 | Name | string | ✓ | 最新の観測で得たチーム名（前後の空白を除去、1〜64コードポイント） |
-| Color | *string | - | チームエンブレムのカラー（`normal`、`gold` など。取得できなかった場合はnil） |
-| DataCollectedAt | time.Time | ✓ | 名前とカラーを観測したプレイヤーデータの取得日時 |
+| Color | *string | - | チームエンブレムのカラー（`normal`、`gold` など英小文字・数字・`_`・`-`の16文字以内。取得できなかった場合はnil） |
+| DataCollectedAt | time.Time | ✓ | 名前とカラーを観測したプレイヤーデータの取得日時（秒未満は切り捨て） |
 | CreatedAt | time.Time | ✓ | 作成日時 |
 | UpdatedAt | time.Time | ✓ | 更新日時 |
 

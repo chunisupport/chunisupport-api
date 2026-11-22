@@ -2,6 +2,7 @@ package entity
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -12,8 +13,11 @@ import (
 var (
 	// ErrTeamNameInvalid はチーム名が空、または上限を超える場合のエラーです。
 	ErrTeamNameInvalid = errors.New("team name is invalid")
-	// ErrTeamColorInvalid はチームカラーが上限を超える場合のエラーです。
+	// ErrTeamColorInvalid はチームカラーが小文字英数字・アンダースコア・ハイフン以外を含むか、上限を超える場合のエラーです。
 	ErrTeamColorInvalid = errors.New("team color is invalid")
+
+	// チームカラーはCHUNITHM-NETのCSSクラス名（normal, gold など）由来で、teams.color はASCII列のため英小文字等に限ります。
+	teamColorPattern = regexp.MustCompile(`^[a-z0-9_-]+$`)
 )
 
 // Team はプレイヤーデータから収集したCHUNITHMのチームです。
@@ -31,6 +35,8 @@ type Team struct {
 
 // NewTeam はプレイヤーデータで観測したチーム情報を検証して生成します。
 // CHUNITHM-NETのテキストには前後の空白や改行が含まれることがあるため、チーム名の前後の空白は除去します。
+// teams.data_collected_at は秒精度で、MySQLは小数秒を四捨五入して保存するため、取得日時は秒未満を切り捨てて
+// 保存値と同じ精度で新旧を比較します。秒未満で前後する観測は同時刻とみなし、先に保存した観測を優先します。
 func NewTeam(code teamcode.TeamCode, name, color string, collectedAt time.Time) (*Team, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || utf8.RuneCountInString(name) > TeamNameMaxLength {
@@ -38,7 +44,7 @@ func NewTeam(code teamcode.TeamCode, name, color string, collectedAt time.Time) 
 	}
 	var colorPtr *string
 	if color != "" {
-		if len(color) > TeamColorMaxLength {
+		if len(color) > TeamColorMaxLength || !teamColorPattern.MatchString(color) {
 			return nil, ErrTeamColorInvalid
 		}
 		colorPtr = &color
@@ -48,7 +54,7 @@ func NewTeam(code teamcode.TeamCode, name, color string, collectedAt time.Time) 
 		Code:            code,
 		Name:            name,
 		Color:           colorPtr,
-		DataCollectedAt: collectedAt,
+		DataCollectedAt: collectedAt.Truncate(time.Second),
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}, nil

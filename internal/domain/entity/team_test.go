@@ -56,6 +56,18 @@ func TestNewTeam(t *testing.T) {
 			wantErr:  ErrTeamNameInvalid,
 		},
 		{
+			name:     "カラーが非ASCII文字を含む場合はエラー",
+			teamName: "チーム名",
+			color:    "緑",
+			wantErr:  ErrTeamColorInvalid,
+		},
+		{
+			name:     "カラーが大文字を含む場合はエラー",
+			teamName: "チーム名",
+			color:    "Green",
+			wantErr:  ErrTeamColorInvalid,
+		},
+		{
 			name:     "カラーが上限を超える場合はエラー",
 			teamName: "チーム名",
 			color:    strings.Repeat("a", TeamColorMaxLength+1),
@@ -147,6 +159,34 @@ func TestTeam_ApplyObservation(t *testing.T) {
 			assert.Equal(t, tt.expectedAt, team.DataCollectedAt)
 		})
 	}
+}
+
+func TestNewTeam_取得日時は秒未満を切り捨てる(t *testing.T) {
+	// Given
+	collectedAt := time.Date(2026, 11, 22, 10, 0, 0, 600_000_000, time.UTC)
+
+	// When
+	team, err := NewTeam(teamcodetest.New(t, "AB12CD"), "チーム名", "green", collectedAt)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC), team.DataCollectedAt)
+}
+
+func TestTeam_ApplyObservation_秒未満だけ新しい観測は同時刻として反映しない(t *testing.T) {
+	// Given: 10:00:00.200 の観測を保存済み
+	base := time.Date(2026, 11, 22, 10, 0, 0, 0, time.UTC)
+	team, err := NewTeam(teamcodetest.New(t, "AB12CD"), "先着", "green", base.Add(200*time.Millisecond))
+	require.NoError(t, err)
+	observed, err := NewTeam(teamcodetest.New(t, "AB12CD"), "後着", "green", base.Add(100*time.Millisecond))
+	require.NoError(t, err)
+
+	// When
+	changed := team.ApplyObservation(observed)
+
+	// Then
+	assert.False(t, changed)
+	assert.Equal(t, "先着", team.Name)
 }
 
 func TestTeam_ApplyObservation_カラーの変更を反映する(t *testing.T) {
