@@ -48,16 +48,38 @@ func BuildRatingSlots(records []RatingSlotRecord, mainLimit, candidateLimit int)
 }
 
 func compareRatingSlotRecord(a, b RatingSlotRecord) int {
-	if ratingComparison := cmp.Compare(calcSingleRatingHundredths(b.Score, b.ChartConst), calcSingleRatingHundredths(a.Score, a.ChartConst)); ratingComparison != 0 {
+	if ratingComparison := cmp.Compare(calcSlotSortRatingHundredths(b.Score, b.ChartConst), calcSlotSortRatingHundredths(a.Score, a.ChartConst)); ratingComparison != 0 {
 		return ratingComparison
 	}
 	if constantComparison := cmp.Compare(chartConstTenths(b.ChartConst), chartConstTenths(a.ChartConst)); constantComparison != 0 {
 		return constantComparison
 	}
-	if scoreComparison := cmp.Compare(a.Score, b.Score); scoreComparison != 0 {
+	// SSS+（1,009,000点）以上はスコア差を無視して公式ID順で並べるため、上限で丸めて比較する。
+	if scoreComparison := cmp.Compare(min(a.Score, constants.SSSPlusScore), min(b.Score, constants.SSSPlusScore)); scoreComparison != 0 {
 		return scoreComparison
 	}
 	return cmp.Compare(a.OfficialIndex, b.OfficialIndex)
+}
+
+// calcSlotSortRatingHundredths は枠の並び替えに使う単曲レーティング（0.01単位の整数）を計算します。
+// 公式枠の実測順位に合わせるため、以下の2点だけ通常計算から補正します。
+//   - ちょうど1,008,999点は SSS+ と同じ「譜面定数 + 2.15」扱いとする
+//   - 900,000～974,999点はランク帯ごとの途中切り捨てを行わず、
+//     譜面定数 + (score - 975,000) / 15,000 を最後に小数第2位で切り捨てる
+func calcSlotSortRatingHundredths(score uint32, chartConst float64) int64 {
+	constTenths := chartConstTenths(chartConst)
+	base := constTenths * 10
+
+	switch {
+	case score == constants.SSSPlusScore-1:
+		return max(base+215, 0)
+	case score >= 900_000 && score < 975_000:
+		// (score - 975,000) / 150 の床関数は (score - 900,000) / 150 - 500 と等価で、
+		// 非負の整数除算のみで正確に切り捨てられる。
+		return max(base+int64(score-900_000)/150-500, 0)
+	default:
+		return calcSingleRatingHundredths(score, chartConst)
+	}
 }
 
 // AggregateOfficialRating は公式本枠だけを使ってRating三値を集計します。
