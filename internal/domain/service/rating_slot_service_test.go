@@ -115,15 +115,63 @@ func TestBuildRatingSlots_レート定数スコアが同じ時は公式IDを数�
 	assert.Equal(t, []int{2, 1}, []int{result.Main[0].ChartID, result.Main[1].ChartID})
 }
 
-func TestBuildRatingSlots_レートと定数が同じ時はスコア昇順で並ぶ(t *testing.T) {
+func TestBuildRatingSlots_レートと定数が同じでSSSPlus未満の時はスコア昇順で並ぶ(t *testing.T) {
+	// Given: 1,009,000点未満で単曲レート(17.00)・定数(15.0)が同じ2譜面
 	records := []RatingSlotRecord{
-		{ChartID: 1, Score: 1_010_000, ChartConst: 15, OfficialIndex: 1},
-		{ChartID: 2, Score: 1_009_000, ChartConst: 15, OfficialIndex: 2},
+		{ChartID: 1, Score: 1_007_550, ChartConst: 15, OfficialIndex: 1},
+		{ChartID: 2, Score: 1_007_500, ChartConst: 15, OfficialIndex: 2},
 	}
 
+	// When
 	result := BuildRatingSlots(records, 2, 10)
 
+	// Then: 公式IDよりスコアの低さが優先される
 	assert.Equal(t, []int{2, 1}, []int{result.Main[0].ChartID, result.Main[1].ChartID})
+}
+
+func TestBuildRatingSlots_SSSPlus同士でレートと定数が同じ時は公式ID昇順で並ぶ(t *testing.T) {
+	// Given: 両方とも1,009,000点以上で単曲レート(17.15)・定数(15.0)が同じ2譜面
+	records := []RatingSlotRecord{
+		{ChartID: 1, Score: 1_009_078, ChartConst: 15, OfficialIndex: 2089},
+		{ChartID: 2, Score: 1_009_617, ChartConst: 15, OfficialIndex: 2060},
+	}
+
+	// When
+	result := BuildRatingSlots(records, 2, 10)
+
+	// Then: 1,009,000点以上のスコア差は無視され、公式IDの昇順で並ぶ
+	assert.Equal(t, []int{2, 1}, []int{result.Main[0].ChartID, result.Main[1].ChartID})
+}
+
+func TestBuildRatingSlots_1008999点はSSSPlus相当レートかつ低スコア扱いで先に来る(t *testing.T) {
+	// Given: 同定数(15.0)の 1,008,998点 / 1,008,999点 / 1,009,000点
+	records := []RatingSlotRecord{
+		{ChartID: 1, Score: 1_009_000, ChartConst: 15, OfficialIndex: 1},
+		{ChartID: 2, Score: 1_008_998, ChartConst: 15, OfficialIndex: 2},
+		{ChartID: 3, Score: 1_008_999, ChartConst: 15, OfficialIndex: 3},
+	}
+
+	// When
+	result := BuildRatingSlots(records, 3, 10)
+
+	// Then: 1,008,999点(並べ替えレート17.15・低スコア) -> 1,009,000点(17.15) -> 1,008,998点(17.14) の順になる
+	assert.Equal(t, []int{3, 1, 2}, []int{result.Main[0].ChartID, result.Main[1].ChartID, result.Main[2].ChartID})
+}
+
+func TestBuildRatingSlots_900000から974999点は最後に小数第2位で切り捨てて並べる(t *testing.T) {
+	// Given:
+	// ChartID 1: 定数14.0・950,100点 -> 14.0 + (950,100 - 975,000) / 15,000 = 12.34（途中切り捨てだと12.33）
+	// ChartID 2: 定数15.0・935,050点 -> 15.0 + (935,050 - 975,000) / 15,000 = 12.336... -> 12.33
+	records := []RatingSlotRecord{
+		{ChartID: 2, Score: 935_050, ChartConst: 15.0, OfficialIndex: 1},
+		{ChartID: 1, Score: 950_100, ChartConst: 14.0, OfficialIndex: 2},
+	}
+
+	// When
+	result := BuildRatingSlots(records, 2, 10)
+
+	// Then: 並べ替えレートが 12.34 > 12.33 となる ChartID 1 が先に来る
+	assert.Equal(t, []int{1, 2}, []int{result.Main[0].ChartID, result.Main[1].ChartID})
 }
 
 func TestBuildRatingSlots_レートとスコアが同じ時は定数降順で並ぶ(t *testing.T) {

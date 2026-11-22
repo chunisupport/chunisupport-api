@@ -60,7 +60,7 @@ const (
 	HonorImageURLMaxLength                      = 255 // honors.image_url の varchar 長
 	UnknownSPHonorRegisteredEvent               = "unknown_sp_honor_registered"
 	PlayerDataBatchLockName                     = "chunisupport:recalculate-player-data"
-	PlayerRecalculationLogicVersion             = 4 // 再計算ロジックのバージョン。フィンガープリントに含めるため、Rating・OVER POWER・枠構築の計算結果が変わる修正では必ず値を上げる（次回バッチで全プレイヤーを再計算する）
+	PlayerRecalculationLogicVersion             = 5 // 再計算ロジックのバージョン。フィンガープリントに含めるため、Rating・OVER POWER・枠構築の計算結果が変わる修正では必ず値を上げる（次回バッチで全プレイヤーを再計算する）
 	StaticDataExportBatchLockName               = "chunisupport:export-static-data"
 	ChartStatsExportBatchLockName               = "chunisupport:export-chart-stats"
 	AllRatingBandID                             = 0
