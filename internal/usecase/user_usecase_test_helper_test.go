@@ -55,5 +55,5 @@ func newPlayerDataUsecaseForTest(
 	lockedRepo repository.PlayerLockedSongRepository,
 	masterCache repository.PlayerDataMasterProvider,
 ) PlayerDataUsecase {
-	return NewPlayerDataUsecase(tm, userRepo, playerRepo, playerRecRepo, worldsendRecRepo, honorRepo, playerDataRepo, lockedRepo, masterCache, nil, nil)
+	return NewPlayerDataUsecase(tm, userRepo, playerRepo, playerRecRepo, worldsendRecRepo, honorRepo, playerDataRepo, lockedRepo, masterCache, nil, nil, nil)
 }

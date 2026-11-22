@@ -48,6 +48,12 @@ var (
 	// ErrSongNotFound は楽曲が見つからなかった場合に返されるエラーです。
 	ErrSongNotFound = errors.New("song not found")
 
+	// ErrTeamNotFound はチームが見つからない場合に返されるエラーです。
+	ErrTeamNotFound = errors.New("team not found")
+
+	// ErrTeamAlreadyExists は同じチームコードのチームが並行して登録済みの場合に返されるエラーです。
+	ErrTeamAlreadyExists = errors.New("team already exists")
+
 	// ErrCourseNotFound はコースが見つからない場合に返されるエラーです。
 	ErrCourseNotFound = errors.New("course not found")
 	// ErrInvalidCourseTracks はコース構成が楽曲・ジャンルマスタと整合しない場合に返します。

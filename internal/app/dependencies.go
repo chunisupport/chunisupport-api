@@ -128,6 +128,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 	chunirecQuery := infra.NewChunirecQueryService(db)
 	adminUserStatisticsQuery := infra.NewAdminUserStatisticsQueryService(db)
 	courseRepo := infra.NewCourseRepository(db)
+	teamRepo := infra.NewTeamRepository()
 	systemMaintenanceRepo := infra.NewSystemMaintenanceRepository(db)
 	tm := transaction.NewTransactionManager(db)
 	systemMaintenanceUsecase, err := usecase.NewSystemMaintenanceUsecase(startupCtx, systemMaintenanceRepo)
@@ -146,7 +147,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 		firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery, songCatalogProvider, courseRepo, tm, goalRepo,
 	)
 	chunirecUsecase := usecase.NewChunirecUsecase(db, userRepo, friendshipRepo, chunirecQuery)
-	playerDataUsecase := usecase.NewPlayerDataUsecase(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo)
+	playerDataUsecase := usecase.NewPlayerDataUsecase(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo, teamRepo)
 	courseUsecase := usecase.NewCourseUsecase(db, tm, courseRepo, userRepo, friendshipRepo)
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, courseRepo, scoreHistoryRepo, friendshipRepo, masterCache)
 	playerMetricHistoryUsecase := usecase.NewPlayerMetricHistoryUsecase(db, userRepo, playerMetricHistoryQuery, friendshipRepo)

@@ -57,11 +57,23 @@ entity "players" as players {
   class_emblem_id: TINYINT
   class_emblem_base_id: TINYINT
   possession_id: TINYINT UNSIGNED NOT NULL
+  team_id: INT UNSIGNED
   last_played_at: DATETIME
   overpower_value: DECIMAL(9, 3)
   official_overpower: DECIMAL(8, 2) NOT NULL
   official_overpower_percent: DECIMAL(5, 2)
   data_collected_at: TIMESTAMP
+  created_at: TIMESTAMP
+  updated_at: TIMESTAMP
+}
+
+entity "teams" as teams {
+  + id: INT UNSIGNED [PK]
+  --
+  code: CHAR(6) NOT NULL [UNIQUE]
+  name: VARCHAR(64) NOT NULL
+  color: VARCHAR(16)
+  data_collected_at: TIMESTAMP NOT NULL
   created_at: TIMESTAMP
   updated_at: TIMESTAMP
 }
@@ -253,6 +265,7 @@ players ||--o{ player_honors
 players }o--|| class_emblems
 players }o--|| class_emblem_bases
 players }|--|| possessions
+players }o--o| teams
 
 honors ||--o{ player_honors
 honors }o--|| honor_types

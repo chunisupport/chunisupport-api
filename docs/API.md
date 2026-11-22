@@ -2027,7 +2027,8 @@ curl -X POST \
   "possession": "rainbow",
   "team": {
     "name": "チーム名",
-    "color": "green"
+    "color": "green",
+    "code": "AB12CD"
   },
   "honors": {
     "1": { "title": "称号1", "class": "platina", "img_url": "https://..." },
@@ -2084,8 +2085,10 @@ curl -X POST \
 | `class_emblem.medal_class` | string | ✓ | クラスエンブレム（0埋め2桁） |
 | `class_emblem.base_class` | string | ✓ | クラスエンブレムベース（0埋め2桁） |
 | `possession` | string | | ポゼッション（`normal`、`silver`、`gold`、`platina`、`rainbow`）。省略時は`normal` |
+| `team` | object \| null | | 所属チーム。チーム未所属の場合は省略または`null` |
 | `team.name` | string | | チーム名 |
 | `team.color` | string | | チームカラー |
+| `team.code` | string | | チームコード（大文字英数字6桁）。チームを一意に識別するために使用します |
 | `honors` | object | | 称号情報（キー: スロット番号 "1"〜"3"） |
 | `scores.standard` | array | ✓ | 通常譜面スコア配列 |
 | `scores.worldsend` | array | ✓ | WORLD'S END スコア配列 |
@@ -2093,6 +2096,12 @@ curl -X POST \
 | `updated_at` | string | ✓ | 更新日時 (ISO8601) |
 
 `rating`、`overpower.value`、`overpower.percentage`は常にセットかつ小数第2位までの値として必要です。いずれかの省略・`null`・小数第3位以下を含む値は`422 validation_failed`となり、既存の公式値を更新しません。`overpower.percentage`は0以上100以下です。既存の`data_collected_at`より古い`updated_at`、同一`updated_at`で異なる公式指標を送信した場合、または同一`updated_at`で保存済み本文と異なる本文を送信した場合は`409 conflict`となり、現在値と履歴の時系列を維持します。同一`updated_at`の再送は、本文のSHA-256ハッシュも一致する場合のみ冪等な入力として受け付けます。
+
+所属チームは`team`の内容に応じて次のように保存します。チーム名は変更できるため、チームの識別には`team.code`を使います。
+
+- `team`がない、または`team.name`と`team.code`がともに空の場合は、チーム未所属として保存します。
+- `team.name`はあるが`team.code`がない場合は、所属先を特定できないため保存済みの所属を維持します。
+- `team.code`がある場合は、チームを登録または更新して所属させます。チーム名とカラーは、保存済みより新しい`updated_at`のデータでのみ更新します。`team.code`が大文字英数字6桁でない場合、`team.name`が空または64文字を超える場合、`team.color`が16文字を超える場合は`422 validation_failed`となります。
 
 **スコアエントリスキーマ (`scores.standard` / `scores.worldsend` の各要素)**:
 

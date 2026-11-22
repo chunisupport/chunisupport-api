@@ -110,6 +110,7 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 | BestAverageRating | *float64 | - | ベスト枠平均レーティング |
 | ClassEmblemID | *int | - | クラスエンブレムID |
 | ClassEmblemBaseID | *int | - | クラスエンブレムベースID |
+| TeamID | *int | - | 所属チームID（`Team` への参照。未所属はnil） |
 | LastPlayedAt | *time.Time | - | 最終プレイ日時 |
 | OverpowerValue | *float64 | - | オーバーパワー値 |
 | OfficialOverpower | float64 | ✓ | 公式オーバーパワー値 |
@@ -123,6 +124,7 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 - **HasOfficialMetricsChanged(rating, overpower, overpowerPercent float64) bool**: 公式RATING・公式OVER POWER・公式OP%の組が変化するかを判定する
 - **ChangeOfficialMetrics(...)**: 取得日時の単調性を守りつつ公式指標を更新し、必要なら更新前状態を履歴化する
 - **PendingMetricHistory() *PlayerMetricHistoryEntry**: 次回の集約保存で追記する公式指標履歴を返す
+- **ChangeTeam(teamID *int)**: 所属チームを変更する。nilはチーム未所属。レーティング計算に影響しないため再計算済みの記録は維持する
 
 #### 不変条件
 
@@ -313,6 +315,40 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - WORLD'S END は1曲につき1譜面のみ
 - `LevelStar` は 1〜5 の範囲
 - `Notes` は0以上の整数
+
+---
+
+### Team（チーム集約）
+
+#### 概要
+プレイヤーデータから収集したCHUNITHMのチームです。チーム名は変更できるため、大文字英数字6桁のチームコード（`teamcode.TeamCode`）で一意に識別します。所属メンバーは `Player.TeamID` から導出し、この集約には含めません。
+
+#### フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+|------------|-----|-----|------|
+| ID | int | ✓ | チームID（主キー。内部の参照専用でAPIには出さない） |
+| Code | teamcode.TeamCode | ✓ | チームコード（大文字英数字6桁、一意） |
+| Name | string | ✓ | 最新の観測で得たチーム名（前後の空白を除去、1〜64コードポイント） |
+| Color | *string | - | チームエンブレムのカラー（`normal`、`gold` など。取得できなかった場合はnil） |
+| DataCollectedAt | time.Time | ✓ | 名前とカラーを観測したプレイヤーデータの取得日時 |
+| CreatedAt | time.Time | ✓ | 作成日時 |
+| UpdatedAt | time.Time | ✓ | 更新日時 |
+
+#### 振る舞い（メソッド）
+
+- **NewTeam(code, name, color, collectedAt)**: プレイヤーデータで観測したチーム情報を検証して生成する
+- **ApplyObservation(observed *Team) bool**: 保存済みより新しい取得日時の観測だけを反映し、保存が必要かを返す。複数メンバーのデータが前後して届いても古いデータで名前を巻き戻さない
+
+#### プレイヤーデータ登録時の扱い
+
+| `team` の内容 | 扱い |
+|------------|------|
+| なし（`null`・名前もコードも空） | チーム未所属として `Player.TeamID` をnilにする |
+| 名前はあるがコードがない | 所属先を特定できないため保存済みの所属を維持する（旧ブックマークレットやチームTOPの取得失敗） |
+| コードあり | チームを登録または更新し、`Player.TeamID` に設定する。コード・名前・カラーが不正な場合は登録全体を検証エラーにする |
+
+チーム行のロックは、同じチームのメンバーによる登録を直列化する時間を短くするため、スコア反映後に取得します。存在しないチームを `FOR UPDATE` で検索するとギャップロックで並行登録がデッドロックするため、ロックなしで存在を確認してからINSERTし、一意制約違反時だけ行ロックして更新します。
 
 ---
 
@@ -560,6 +596,12 @@ X の連携を解除・変更しても自動では消えないため、表示側
 ---
 
 ## 値オブジェクト一覧
+
+### teamcode.TeamCode
+
+- CHUNITHM-NETのチームTOPに表示されるチームコード。大文字英数字6桁（`^[A-Z0-9]{6}$`）に限る。
+- 取得処理の不具合を隠さないよう、小文字や前後の空白は正規化せずに拒否します。
+- `String()` で値を参照します。テストでは `teamcodetest.New(tb, value)` を使用します。
 
 ### profilecomment.ProfileComment
 

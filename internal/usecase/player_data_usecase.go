@@ -38,9 +38,11 @@ type PlayerDataClassPayload struct {
 }
 
 // PlayerDataTeamPayload はチーム情報です。
+// Name と Code がともに空の場合はチーム未所属、Code だけが空の場合はチームコードを取得できなかったものとして扱います。
 type PlayerDataTeamPayload struct {
 	Name  string
 	Color string
+	Code  string
 }
 
 // PlayerDataHonorPayload は称号スロットの情報です。
@@ -147,4 +149,8 @@ type PlayerDataSummaryInput struct {
 	ClassEmblemID            *int
 	ClassBaseID              *int
 	PossessionID             int
+	// TeamResolved は所属チームを確定できたかを表します。false の間は保存済みの所属を維持します。
+	TeamResolved bool
+	// TeamID は確定した所属チームのIDです。nilはチーム未所属を表します。
+	TeamID *int
 }

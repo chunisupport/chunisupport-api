@@ -209,6 +209,8 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 
 計算レーティング、Best枠平均、New枠平均、計算OVER POWER値は移行せず、移行先で再計算する。`players.updated_at`および`users.updated_at`はインポート日時に更新する。
 
+所属チーム（`players.team_id`）は移行形式に含めず、インポート直後は未所属とする。移行先で次にプレイヤーデータを登録した時点で設定する。
+
 ### 7.2 通常譜面レコードと履歴
 
 現在レコードには、楽曲`official_idx`、難易度名、スコア、各ランプ名、スロット名、`slot_order`、更新日時を格納する。難易度名は`BASIC`、`ADVANCED`、`EXPERT`、`MASTER`、`ULTIMA`のいずれかである。

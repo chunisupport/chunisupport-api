@@ -476,6 +476,7 @@ CREATE TABLE `players` (
   `class_emblem_id` tinyint unsigned DEFAULT NULL,
   `class_emblem_base_id` tinyint unsigned DEFAULT NULL,
   `possession_id` tinyint unsigned NOT NULL DEFAULT '1',
+  `team_id` int unsigned DEFAULT NULL,
   `last_played_at` datetime DEFAULT NULL,
   `overpower_value` decimal(9,3) DEFAULT NULL,
   `official_overpower` decimal(8,2) NOT NULL DEFAULT '0.00',
@@ -490,10 +491,12 @@ CREATE TABLE `players` (
   KEY `class_emblem_base_id` (`class_emblem_base_id`),
   KEY `idx_players_possession_id` (`possession_id`),
   KEY `idx_players_player_name` (`player_name`),
+  KEY `idx_players_team_id` (`team_id`),
   CONSTRAINT `fk_players_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `players_ibfk_1` FOREIGN KEY (`class_emblem_id`) REFERENCES `class_emblems` (`id`),
   CONSTRAINT `players_ibfk_2` FOREIGN KEY (`class_emblem_base_id`) REFERENCES `class_emblem_bases` (`id`),
   CONSTRAINT `fk_players_possession_id` FOREIGN KEY (`possession_id`) REFERENCES `possessions` (`id`),
+  CONSTRAINT `fk_players_team_id` FOREIGN KEY (`team_id`) REFERENCES `teams` (`id`) ON DELETE SET NULL,
   CONSTRAINT `players_chk_1` CHECK ((`player_level` >= 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `rating_bands` (
@@ -572,6 +575,18 @@ CREATE TABLE `system_maintenance` (
   KEY `fk_system_maintenance_updated_by_user` (`updated_by_user_id`),
   CONSTRAINT `fk_system_maintenance_updated_by_user` FOREIGN KEY (`updated_by_user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `chk_system_maintenance_singleton` CHECK ((`id` = 1))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `teams` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `code` char(6) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  `name` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `color` varchar(16) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+  `data_collected_at` timestamp NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_teams_code` (`code`),
+  CONSTRAINT `chk_teams_code` CHECK (regexp_like(`code`,_utf8mb4'^[A-Z0-9]{6}$',_utf8mb4'c'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `user_profiles` (
   `user_id` int unsigned NOT NULL,

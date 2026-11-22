@@ -91,11 +91,23 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `best_average_rating`: ベスト枠の平均レーティング（DECIMAL(6,4)）。
     - `class_emblem_id`, `class_emblem_base_id`: クラスエンブレム情報への外部キー。
     - `possession_id`: ポゼッション（`normal`、`silver`、`gold`、`platina`、`rainbow`）への外部キー。未指定時は `normal`（ID=1）。NULL不可。
+    - `team_id`: 所属チーム（`teams`）への外部キー。未所属・未取得はNULL。チーム削除時はNULLに戻る（`ON DELETE SET NULL`）。
     - `last_played_at`: 最終プレイ日時。
     - `overpower_value`: 保存済みのOVER POWER値。割合はAPI返却時に最新マスタから随時計算。
     - `data_collected_at`: CHUNITHM-NETからのデータ取得完了日時。取得前の既存データはNULL。
     - `created_at`, `updated_at`: 作成日時、更新日時。
     - `recalculated_master_fingerprint`: プレイヤーデータ再計算バッチが直近の再計算に使ったマスタと計算ロジックのフィンガープリント（SHA-256の16進数小文字）。NULLは次回のバッチで再計算が必要であることを表す。
+
+#### `teams`
+- **役割**: プレイヤーデータから収集したCHUNITHMのチームを格納します。所属メンバーは `players.team_id` から導出します。
+- **主なカラム**:
+    - `id`: チームのユニークID。内部の参照専用で、APIには出さない。
+    - `code`: チームコード（大文字英数字6桁、`ascii_bin`、一意制約・CHECK制約）。チーム名は変更できるため、チームの識別にはこの値を使う。
+    - `name`: 最新の観測で得たチーム名（64文字まで）。
+    - `color`: チームエンブレムのカラー（`normal`、`gold` など）。取得できなかった場合はNULL。
+    - `data_collected_at`: `name`・`color` を観測したプレイヤーデータの取得日時。これより古いプレイヤーデータでは更新しない。
+    - `created_at`, `updated_at`: 作成日時、更新日時。
+- **追加マイグレーション**: `000071_create_teams`（upで `teams` 作成と `players.team_id` 追加、downで削除）。
 
 #### `player_records`
 - **役割**: プレイヤーの通常譜面に対するスコア記録を格納します。

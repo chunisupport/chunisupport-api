@@ -33,10 +33,11 @@ type playerDataUsecase struct {
 	masterCache      repository.PlayerDataMasterProvider
 	scoreHistoryRepo repository.ScoreHistoryRepository
 	courseRepo       repository.CourseRepository
+	teamRepo         repository.TeamRepository
 }
 
 // NewPlayerDataUsecase は PlayerDataUsecase の実装を生成します。
-// scoreHistoryRepo はスコア履歴の保存、courseRepo はコース記録の保存に使います。
+// scoreHistoryRepo はスコア履歴の保存、courseRepo はコース記録の保存、teamRepo は所属チームの保存に使います。
 func NewPlayerDataUsecase(
 	tm TransactionManager,
 	userRepo repository.UserRepository,
@@ -49,6 +50,7 @@ func NewPlayerDataUsecase(
 	masterCache repository.PlayerDataMasterProvider,
 	scoreHistoryRepo repository.ScoreHistoryRepository,
 	courseRepo repository.CourseRepository,
+	teamRepo repository.TeamRepository,
 ) PlayerDataUsecase {
 	if playerRecRepo == nil {
 		panic("player record repository is required")
@@ -69,6 +71,7 @@ func NewPlayerDataUsecase(
 		masterCache:      masterCache,
 		scoreHistoryRepo: scoreHistoryRepo,
 		courseRepo:       courseRepo,
+		teamRepo:         teamRepo,
 	}
 }
 
@@ -92,6 +95,11 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 	if err := validatePlayerDataPayload(payload); err != nil {
 		slog.WarnContext(ctx, "player data validation failed", "user_id", user.ID, "error", err.Error())
 		return nil, fmt.Errorf("invalid player data: %w", err)
+	}
+
+	teamObservation, err := newPlayerTeamObservation(payload.Team, updatedAt)
+	if err != nil {
+		return nil, err
 	}
 
 	summaryInput := &PlayerDataSummaryInput{
@@ -174,6 +182,16 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		skippedRecords = append(skippedRecords, scoreSkipped...)
 		summaryInput.OverpowerValue = overpowerSummary.Value
 		summaryInput.OverpowerPercent = overpowerSummary.Percent
+
+		// 同じチームのメンバーによる登録を直列化する時間を短くするため、チーム行のロックはスコア反映後に取得します。
+		if teamObservation.resolved {
+			teamID, teamErr := us.resolvePlayerTeamID(ctx, tx, teamObservation)
+			if teamErr != nil {
+				return teamErr
+			}
+			summaryInput.TeamResolved = true
+			summaryInput.TeamID = teamID
+		}
 
 		// 保存済みのプレイヤーを読み直し、処理済みの指標履歴を再保存しないようにします。
 		updatedPlayer, lockErr := us.playerRepo.FindByUserIDForUpdate(ctx, tx, lockedUser.ID)
@@ -333,6 +351,9 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 	}
 	player.ChangeProfileWithPossession(playerName, summary.Level, summary.ClassEmblemID, summary.ClassBaseID, summary.PossessionID, summary.LastPlayedAt)
 	player.ChangeOverpower(summary.OverpowerValue, summary.OverpowerPercent)
+	if summary.TeamResolved {
+		player.ChangeTeam(summary.TeamID)
+	}
 
 	if err := player.ChangeOfficialMetrics(summary.OfficialRating, summary.OfficialOverpower, summary.OfficialOverpowerPercent, updatedAt); err != nil {
 		return 0, nil, &PlayerDataConflictError{Reason: err.Error(), Err: err}
