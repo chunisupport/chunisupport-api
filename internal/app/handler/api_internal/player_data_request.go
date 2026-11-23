@@ -34,6 +34,7 @@ type playerDataClassRequest struct {
 type playerDataTeamRequest struct {
 	Name  string `json:"name"`
 	Color string `json:"color"`
+	Code  string `json:"code"`
 }
 type playerDataHonorRequest struct {
 	Title string  `json:"title"`
@@ -79,7 +80,7 @@ func (r playerDataRequest) toUsecase() usecase.PlayerDataPayload {
 	for i, value := range r.Scores.Course {
 		courses[i] = usecase.PlayerDataCourseEntry{Score: value.Score, IsClear: value.IsClear, ComboLv: value.ComboLv, Idx: value.Idx}
 	}
-	return usecase.PlayerDataPayload{AppVersion: r.AppVersion, Name: r.Name, Level: r.Level, Rating: r.Rating, LastPlayed: r.LastPlayed, Overpower: usecase.PlayerDataOverpowerPayload{Value: r.Overpower.Value, Percentage: r.Overpower.Percentage}, ClassEmblem: usecase.PlayerDataClassPayload{MedalClass: r.ClassEmblem.MedalClass, BaseClass: r.ClassEmblem.BaseClass}, Possession: r.Possession, Team: usecase.PlayerDataTeamPayload{Name: r.Team.Name, Color: r.Team.Color}, Honors: honors, Scores: usecase.PlayerDataScorePayload{Standard: standard, Worldsend: worldsend, Course: courses}, UpdatedAt: r.UpdatedAt}
+	return usecase.PlayerDataPayload{AppVersion: r.AppVersion, Name: r.Name, Level: r.Level, Rating: r.Rating, LastPlayed: r.LastPlayed, Overpower: usecase.PlayerDataOverpowerPayload{Value: r.Overpower.Value, Percentage: r.Overpower.Percentage}, ClassEmblem: usecase.PlayerDataClassPayload{MedalClass: r.ClassEmblem.MedalClass, BaseClass: r.ClassEmblem.BaseClass}, Possession: r.Possession, Team: usecase.PlayerDataTeamPayload{Name: r.Team.Name, Color: r.Team.Color, Code: r.Team.Code}, Honors: honors, Scores: usecase.PlayerDataScorePayload{Standard: standard, Worldsend: worldsend, Course: courses}, UpdatedAt: r.UpdatedAt}
 }
 func (r playerDataScoreEntryRequest) toUsecase() usecase.PlayerDataScoreEntry {
 	return usecase.PlayerDataScoreEntry{Diff: r.Diff, Idx: r.Idx, Score: r.Score, ClearLamp: r.ClearLamp, ComboLv: r.ComboLv, FullChain: r.FullChain, Slot: r.Slot, Order: r.Order}

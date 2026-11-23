@@ -12,4 +12,8 @@ const (
 	DifficultyIDExpert   = 3
 	DifficultyIDMaster   = 4
 	DifficultyIDUltima   = 5
+	// TeamNameMaxLength はチーム名の最大コードポイント数です（players.team_name の VARCHAR 長と一致させます）。
+	TeamNameMaxLength = 64
+	// TeamColorMaxLength はチームカラーの最大バイト数です（players.team_color の VARCHAR 長と一致させます）。
+	TeamColorMaxLength = 16
 )

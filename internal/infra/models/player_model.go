@@ -6,6 +6,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/teamcode"
 )
 
 // PlayerModel はデータベース用のPlayerモデルです。
@@ -21,6 +22,9 @@ type PlayerModel struct {
 	ClassEmblemID                 *int                           `db:"class_emblem_id"`
 	ClassEmblemBaseID             *int                           `db:"class_emblem_base_id"`
 	PossessionID                  int                            `db:"possession_id"`
+	TeamCode                      *string                        `db:"team_code"`
+	TeamName                      *string                        `db:"team_name"`
+	TeamColor                     *string                        `db:"team_color"`
 	LastPlayedAt                  *time.Time                     `db:"last_played_at"`
 	OverpowerValue                *float64                       `db:"overpower_value"`
 	OfficialOverpower             float64                        `db:"official_overpower"`
@@ -37,6 +41,11 @@ func (m *PlayerModel) ToEntity() (*entity.Player, error) {
 		return nil, err
 	}
 
+	team, err := m.toPlayerTeam()
+	if err != nil {
+		return nil, err
+	}
+
 	return &entity.Player{
 		ID:                            m.ID,
 		UserID:                        m.UserID,
@@ -49,6 +58,7 @@ func (m *PlayerModel) ToEntity() (*entity.Player, error) {
 		ClassEmblemID:                 m.ClassEmblemID,
 		ClassEmblemBaseID:             m.ClassEmblemBaseID,
 		PossessionID:                  m.PossessionID,
+		Team:                          team,
 		LastPlayedAt:                  m.LastPlayedAt,
 		OverpowerValue:                m.OverpowerValue,
 		OfficialOverpower:             m.OfficialOverpower,
@@ -60,7 +70,38 @@ func (m *PlayerModel) ToEntity() (*entity.Player, error) {
 	}, nil
 }
 
+// toPlayerTeam はチーム列から所属チームを復元します。チームコードがNULLの行はチーム未所属です。
+func (m *PlayerModel) toPlayerTeam() (*entity.PlayerTeam, error) {
+	if m.TeamCode == nil {
+		return nil, nil
+	}
+	code, err := teamcode.NewTeamCode(*m.TeamCode)
+	if err != nil {
+		return nil, err
+	}
+	var name, color string
+	if m.TeamName != nil {
+		name = *m.TeamName
+	}
+	if m.TeamColor != nil {
+		color = *m.TeamColor
+	}
+	return entity.NewPlayerTeam(code, name, color)
+}
+
+// PlayerTeamColumns は所属チームを players.team_code / team_name / team_color の値へ変換します。
+// チーム未所属の場合はすべてNULLです。
+func PlayerTeamColumns(team *entity.PlayerTeam) (code, name, color *string) {
+	if team == nil {
+		return nil, nil, nil
+	}
+	codeValue := team.Code().String()
+	nameValue := team.Name()
+	return &codeValue, &nameValue, team.Color()
+}
+
 func FromPlayerEntity(e *entity.Player) *PlayerModel {
+	teamCode, teamName, teamColor := PlayerTeamColumns(e.Team)
 	return &PlayerModel{
 		ID:                            e.ID,
 		UserID:                        e.UserID,
@@ -73,6 +114,9 @@ func FromPlayerEntity(e *entity.Player) *PlayerModel {
 		ClassEmblemID:                 e.ClassEmblemID,
 		ClassEmblemBaseID:             e.ClassEmblemBaseID,
 		PossessionID:                  e.PossessionID,
+		TeamCode:                      teamCode,
+		TeamName:                      teamName,
+		TeamColor:                     teamColor,
 		LastPlayedAt:                  e.LastPlayedAt,
 		OverpowerValue:                e.OverpowerValue,
 		OfficialOverpower:             e.OfficialOverpower,

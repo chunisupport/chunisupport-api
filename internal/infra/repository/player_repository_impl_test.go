@@ -11,6 +11,7 @@ import (
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/teamcode/teamcodetest"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -202,6 +203,9 @@ func setupPlayerRepositorySchema(t *testing.T, db *sqlx.DB) {
 			class_emblem_id INTEGER NULL,
 			class_emblem_base_id INTEGER NULL,
 			possession_id INTEGER NOT NULL DEFAULT 1,
+			team_code TEXT NULL,
+			team_name TEXT NULL,
+			team_color TEXT NULL,
 			last_played_at DATETIME NULL,
 			overpower_value REAL NULL,
 			official_overpower REAL NULL,
@@ -280,6 +284,78 @@ func TestPlayerRepository_Save_ポゼッションを保存して復元する(t *
 	saved, err := repo.FindByID(context.Background(), db, 1)
 	require.NoError(t, err)
 	assert.Equal(t, 5, saved.PossessionID)
+}
+
+func TestPlayerRepository_Save_所属チームを保存して復元する(t *testing.T) {
+	tests := []struct {
+		name string
+		// Given
+		color string
+		// Then
+		expectTeam  bool
+		expectColor *string
+	}{
+		{name: "所属チームを保存する", color: "green", expectTeam: true, expectColor: new("green")},
+		{name: "カラー未取得の所属チームを保存する", color: "", expectTeam: true, expectColor: nil},
+		{name: "未所属はNULLとして保存する", expectTeam: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			db := setupPlayerRepositorySQLite(t)
+			seedPlayerWithHonors(t, db, 1, false)
+			_, err := db.Exec(`UPDATE players SET team_code = 'ZZZZZZ', team_name = '旧チーム', team_color = 'gold' WHERE id = 1`)
+			require.NoError(t, err)
+			repo := &playerRepository{db: db}
+			player, err := repo.FindByID(context.Background(), db, 1)
+			require.NoError(t, err)
+			var team *entity.PlayerTeam
+			if tt.expectTeam {
+				team, err = entity.NewPlayerTeam(teamcodetest.New(t, "AB12CD"), "チーム名", tt.color)
+				require.NoError(t, err)
+			}
+			player.ChangeTeam(team)
+
+			// When
+			require.NoError(t, repo.Save(context.Background(), db, player))
+
+			// Then
+			byID, err := repo.FindByID(context.Background(), db, 1)
+			require.NoError(t, err)
+			byUserID, err := repo.FindByUserID(context.Background(), db, 20)
+			require.NoError(t, err)
+			withHonors, err := repo.FindByIDWithHonors(context.Background(), db, 1)
+			require.NoError(t, err)
+			for _, saved := range []*entity.Player{byID, byUserID, withHonors.Player} {
+				if !tt.expectTeam {
+					assert.Nil(t, saved.Team)
+					continue
+				}
+				require.NotNil(t, saved.Team)
+				assert.Equal(t, "AB12CD", saved.Team.Code().String())
+				assert.Equal(t, "チーム名", saved.Team.Name())
+				assert.Equal(t, tt.expectColor, saved.Team.Color())
+			}
+		})
+	}
+}
+
+func TestPlayerRepository_Save_新規作成時に所属チームを保存する(t *testing.T) {
+	// Given
+	db := setupPlayerRepositorySQLite(t)
+	repo := &playerRepository{db: db}
+	player := entity.NewPlayer(30, playernametest.New(t, "新規"))
+	team, err := entity.NewPlayerTeam(teamcodetest.New(t, "AB12CD"), "チーム名", "green")
+	require.NoError(t, err)
+	player.ChangeTeam(team)
+
+	// When
+	require.NoError(t, repo.Save(context.Background(), db, player))
+
+	// Then
+	saved, err := repo.FindByID(context.Background(), db, player.ID)
+	require.NoError(t, err)
+	assert.Equal(t, team, saved.Team)
 }
 
 func TestPlayerRepository_Save_再計算済みフィンガープリントを保存して復元する(t *testing.T) {

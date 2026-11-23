@@ -91,6 +91,9 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `best_average_rating`: ベスト枠の平均レーティング（DECIMAL(6,4)）。
     - `class_emblem_id`, `class_emblem_base_id`: クラスエンブレム情報への外部キー。
     - `possession_id`: ポゼッション（`normal`、`silver`、`gold`、`platina`、`rainbow`）への外部キー。未指定時は `normal`（ID=1）。NULL不可。
+    - `team_code`: 所属チームのチームコード（大文字英数字6桁、`ascii_bin`、CHECK制約・インデックス）。未所属・未取得はNULL。チームは独立したテーブルを持たず、同じ `team_code` のプレイヤーの集まりとして扱う。
+    - `team_name`, `team_color`: プレイヤーデータで観測したチーム名（64文字まで）とチームエンブレムのカラー。`team_code` がNULLの場合はともにNULL、`team_code` がある場合 `team_name` は必須（CHECK制約）。
+    - 追加マイグレーション: `000071_add_player_teams`。
     - `last_played_at`: 最終プレイ日時。
     - `overpower_value`: 保存済みのOVER POWER値。割合はAPI返却時に最新マスタから随時計算。
     - `data_collected_at`: CHUNITHM-NETからのデータ取得完了日時。取得前の既存データはNULL。
