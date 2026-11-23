@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"time"
@@ -40,6 +41,10 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	courseRecordsToUpsert = normalizeCourseRecordsForUpsert(courseRecordsToUpsert)
 	if err := validateFullRecordSlots(fullRecordsToUpsert, masters); err != nil {
 		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
+	}
+	for candidateSlot, chartIDs := range findCandidatesAboveMainSlot(fullRecordsToUpsert, masters) {
+		slog.WarnContext(ctx, "候補枠に本枠下限を上回る単曲レートの譜面があります",
+			"player_id", playerID, "slot_name", candidateSlot, "chart_ids", chartIDs)
 	}
 
 	fullBefore, err := us.playerDataRepo.FindPlayerRecordStatesByChartIDs(ctx, tx, playerID, collectFullChartIDs(fullRecordsToUpsert))

@@ -94,6 +94,11 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		return nil, fmt.Errorf("invalid player data: %w", err)
 	}
 
+	teamObservation, err := newPlayerTeamObservation(payload.Team)
+	if err != nil {
+		return nil, err
+	}
+
 	summaryInput := &PlayerDataSummaryInput{
 		Name:                     nameVO.String(),
 		Level:                    payload.Level,
@@ -101,6 +106,8 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		OfficialOverpower:        normalizeOfficialMetric(*payload.Overpower.Value),
 		OfficialOverpowerPercent: normalizeOfficialMetric(*payload.Overpower.Percentage),
 		LastPlayedAt:             lastPlayedAt,
+		TeamResolved:             teamObservation.resolved,
+		Team:                     teamObservation.team,
 	}
 
 	result := &api_internal.PlayerDataResult{
@@ -333,6 +340,9 @@ func (us *playerDataUsecase) ensurePlayer(ctx context.Context, tx repository.Exe
 	}
 	player.ChangeProfileWithPossession(playerName, summary.Level, summary.ClassEmblemID, summary.ClassBaseID, summary.PossessionID, summary.LastPlayedAt)
 	player.ChangeOverpower(summary.OverpowerValue, summary.OverpowerPercent)
+	if summary.TeamResolved {
+		player.ChangeTeam(summary.Team)
+	}
 
 	if err := player.ChangeOfficialMetrics(summary.OfficialRating, summary.OfficialOverpower, summary.OfficialOverpowerPercent, updatedAt); err != nil {
 		return 0, nil, &PlayerDataConflictError{Reason: err.Error(), Err: err}

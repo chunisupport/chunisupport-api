@@ -21,6 +21,7 @@ type Player struct {
 	ClassEmblemID                 *int                           // クラスエンブレムID
 	ClassEmblemBaseID             *int                           // クラスエンブレムのベースID
 	PossessionID                  int                            // ポゼッションID（未指定時は normal）
+	Team                          *PlayerTeam                    // 所属チーム（未所属・未取得はnil）
 	LastPlayedAt                  *time.Time                     // 最終プレイ日時
 	OverpowerValue                *float64                       // オーバーパワー値
 	OfficialOverpower             float64                        // 公式オーバーパワー値
@@ -108,6 +109,12 @@ func (p *Player) changeProfile(name playername.PlayerName, level int, classEmble
 	p.LastPlayedAt = lastPlayedAt
 	// 最終プレイ日時は現行版かどうかの判定に使うため、再計算済みの記録を無効にします。
 	p.RecalculatedMasterFingerprint = nil
+}
+
+// ChangeTeam は所属チームを変更します。nilはチーム未所属を表します。
+// チームはレーティング計算に影響しないため、再計算済みの記録は維持します。
+func (p *Player) ChangeTeam(team *PlayerTeam) {
+	p.Team = team
 }
 
 // ChangeCalculatedRatings は公式指標と取得日時を維持して、再計算した指標だけを反映します。

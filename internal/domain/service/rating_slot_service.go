@@ -47,6 +47,26 @@ func BuildRatingSlots(records []RatingSlotRecord, mainLimit, candidateLimit int)
 	return result
 }
 
+// FindCandidatesAboveMainThreshold は本枠下限の単曲レートを上回る候補枠レコードを返します。
+// 公式の候補枠は本枠に入らなかった譜面から選ばれるため、該当があれば定数マスターの誤りなどを示します。
+// 公式順位と同じ基準で比べるため並び替え用の単曲レートを使い、同値は正常として扱います。
+func FindCandidatesAboveMainThreshold(main, candidates []RatingSlotRecord) []RatingSlotRecord {
+	if len(main) == 0 {
+		return nil
+	}
+	threshold := calcSlotSortRatingHundredths(main[0].Score, main[0].ChartConst)
+	for _, record := range main[1:] {
+		threshold = min(threshold, calcSlotSortRatingHundredths(record.Score, record.ChartConst))
+	}
+	var exceeded []RatingSlotRecord
+	for _, record := range candidates {
+		if calcSlotSortRatingHundredths(record.Score, record.ChartConst) > threshold {
+			exceeded = append(exceeded, record)
+		}
+	}
+	return exceeded
+}
+
 func compareRatingSlotRecord(a, b RatingSlotRecord) int {
 	if ratingComparison := cmp.Compare(calcSlotSortRatingHundredths(b.Score, b.ChartConst), calcSlotSortRatingHundredths(a.Score, a.ChartConst)); ratingComparison != 0 {
 		return ratingComparison

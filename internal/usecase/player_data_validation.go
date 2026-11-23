@@ -8,6 +8,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
@@ -235,6 +236,32 @@ func validateFullRecordSlots(records []repository.PlayerRecordForUpsert, masters
 		}
 	}
 	return nil
+}
+
+// findCandidatesAboveMainSlot は本枠下限の単曲レートを上回る候補枠の譜面IDを候補枠名ごとに返します。
+// 定数マスターの誤りで正しいpayloadを拒否しないよう、登録は止めずに警告ログで知らせるために使います。
+// 定数不明の譜面はレートが信頼できないため、本枠・候補枠のどちらの比較にも使いません。
+func findCandidatesAboveMainSlot(records []repository.PlayerRecordForUpsert, masters *playerDataMaster) map[string][]int {
+	slots := make(map[string][]service.RatingSlotRecord)
+	for _, record := range records {
+		chart, ok := masters.chartsByID[record.ChartID]
+		if !ok || chart.IsConstUnknown {
+			continue
+		}
+		slotName := masters.SlotNamesByID[record.State.SlotID]
+		slots[slotName] = append(slots[slotName], service.RatingSlotRecord{
+			ChartID:    record.ChartID,
+			Score:      uint32(record.State.Score), // #nosec G115 -- applyFullScoresで0～1,010,000の範囲外を除外済みのため
+			ChartConst: chart.Const.Float64(),
+		})
+	}
+	result := make(map[string][]int)
+	for mainSlot, candidateSlot := range map[string]string{"best": "best_candidate", "new": "new_candidate"} {
+		for _, record := range service.FindCandidatesAboveMainThreshold(slots[mainSlot], slots[candidateSlot]) {
+			result[candidateSlot] = append(result[candidateSlot], record.ChartID)
+		}
+	}
+	return result
 }
 
 func playerDataSlotLimit(slotName string) (int, bool) {
