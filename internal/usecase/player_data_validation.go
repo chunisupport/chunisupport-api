@@ -251,7 +251,7 @@ func findCandidatesAboveMainSlot(records []repository.PlayerRecordForUpsert, mas
 		slotName := masters.SlotNamesByID[record.State.SlotID]
 		slots[slotName] = append(slots[slotName], service.RatingSlotRecord{
 			ChartID:    record.ChartID,
-			Score:      uint32(record.State.Score),
+			Score:      uint32(record.State.Score), // #nosec G115 -- applyFullScoresで0～1,010,000の範囲外を除外済みのため
 			ChartConst: chart.Const.Float64(),
 		})
 	}
