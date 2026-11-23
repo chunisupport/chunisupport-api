@@ -110,6 +110,7 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 | BestAverageRating | *float64 | - | ベスト枠平均レーティング |
 | ClassEmblemID | *int | - | クラスエンブレムID |
 | ClassEmblemBaseID | *int | - | クラスエンブレムベースID |
+| Team | *PlayerTeam | - | 所属チーム（未所属・未取得はnil） |
 | LastPlayedAt | *time.Time | - | 最終プレイ日時 |
 | OverpowerValue | *float64 | - | オーバーパワー値 |
 | OfficialOverpower | float64 | ✓ | 公式オーバーパワー値 |
@@ -123,6 +124,7 @@ CHUNITHM プレイヤーの情報を表すエンティティ。レーティン�
 - **HasOfficialMetricsChanged(rating, overpower, overpowerPercent float64) bool**: 公式RATING・公式OVER POWER・公式OP%の組が変化するかを判定する
 - **ChangeOfficialMetrics(...)**: 取得日時の単調性を守りつつ公式指標を更新し、必要なら更新前状態を履歴化する
 - **PendingMetricHistory() *PlayerMetricHistoryEntry**: 次回の集約保存で追記する公式指標履歴を返す
+- **ChangeTeam(team *PlayerTeam)**: 所属チームを変更する。nilはチーム未所属。レーティング計算に影響しないため再計算済みの記録は維持する
 
 #### 不変条件
 
@@ -313,6 +315,36 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - WORLD'S END は1曲につき1譜面のみ
 - `LevelStar` は 1〜5 の範囲
 - `Notes` は0以上の整数
+
+---
+
+### PlayerTeam（所属チーム）
+
+#### 概要
+プレイヤーデータで観測した所属チームで、`Player` の一部として保存します。チームはChuniSupport上で独立した集約として管理せず、同じチームコードを持つプレイヤーの集まりとして扱います。そのため、メンバーがいなくなればチームも自然に消えます。チーム名は変更できるため、チームの識別にはチームコード（`teamcode.TeamCode`）を使います。
+
+#### フィールド
+
+| フィールド名 | 型 | 必須 | 説明 |
+|------------|-----|-----|------|
+| code | teamcode.TeamCode | ✓ | チームコード（大文字英数字6桁） |
+| name | string | ✓ | 観測したチーム名（前後の空白を除去、1〜64コードポイント） |
+| color | *string | - | チームエンブレムのカラー（`normal`、`gold` など英小文字・数字・`_`・`-`の16文字以内。取得できなかった場合はnil） |
+
+#### 振る舞い（メソッド）
+
+- **NewPlayerTeam(code, name, color)**: 観測したチーム情報を検証して生成する
+- **Code() / Name() / Color()**: 各値を参照する
+
+#### プレイヤーデータ登録時の扱い
+
+| `team` の内容 | 扱い |
+|------------|------|
+| なし（`null`・名前もコードも空） | チーム未所属として `Player.Team` をnilにする |
+| 名前はあるがコードがない | 所属先を特定できないため保存済みの所属を維持する（旧ブックマークレットやチームTOPの取得失敗） |
+| コードあり | `Player.Team` に設定する。コード・名前・カラーが不正な場合は登録全体を検証エラーにする |
+
+チーム名とカラーはプレイヤーごとに保存するため、チーム名の変更前後のデータが混在する間はメンバーによって値が異なることがあります。チームとして1つの名前を表示する場合は、メンバーのうち `data_collected_at` が最も新しいプレイヤーの値を使う想定です。
 
 ---
 
@@ -560,6 +592,12 @@ X の連携を解除・変更しても自動では消えないため、表示側
 ---
 
 ## 値オブジェクト一覧
+
+### teamcode.TeamCode
+
+- CHUNITHM-NETのチームTOPに表示されるチームコード。大文字英数字6桁（`^[A-Z0-9]{6}$`）に限る。
+- 取得処理の不具合を隠さないよう、小文字や前後の空白は正規化せずに拒否します。
+- `String()` で値を参照します。テストでは `teamcodetest.New(tb, value)` を使用します。
 
 ### profilecomment.ProfileComment
 

@@ -476,6 +476,9 @@ CREATE TABLE `players` (
   `class_emblem_id` tinyint unsigned DEFAULT NULL,
   `class_emblem_base_id` tinyint unsigned DEFAULT NULL,
   `possession_id` tinyint unsigned NOT NULL DEFAULT '1',
+  `team_code` char(6) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
+  `team_name` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `team_color` varchar(16) CHARACTER SET ascii COLLATE ascii_bin DEFAULT NULL,
   `last_played_at` datetime DEFAULT NULL,
   `overpower_value` decimal(9,3) DEFAULT NULL,
   `official_overpower` decimal(8,2) NOT NULL DEFAULT '0.00',
@@ -490,10 +493,13 @@ CREATE TABLE `players` (
   KEY `class_emblem_base_id` (`class_emblem_base_id`),
   KEY `idx_players_possession_id` (`possession_id`),
   KEY `idx_players_player_name` (`player_name`),
+  KEY `idx_players_team_code` (`team_code`),
   CONSTRAINT `fk_players_user_id` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   CONSTRAINT `players_ibfk_1` FOREIGN KEY (`class_emblem_id`) REFERENCES `class_emblems` (`id`),
   CONSTRAINT `players_ibfk_2` FOREIGN KEY (`class_emblem_base_id`) REFERENCES `class_emblem_bases` (`id`),
   CONSTRAINT `fk_players_possession_id` FOREIGN KEY (`possession_id`) REFERENCES `possessions` (`id`),
+  CONSTRAINT `chk_players_team` CHECK ((((`team_code` is null) and (`team_name` is null) and (`team_color` is null)) or ((`team_code` is not null) and (`team_name` is not null)))),
+  CONSTRAINT `chk_players_team_code` CHECK (((`team_code` is null) or regexp_like(`team_code`,_utf8mb4'^[A-Z0-9]{6}$',_utf8mb4'c'))),
   CONSTRAINT `players_chk_1` CHECK ((`player_level` >= 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `rating_bands` (

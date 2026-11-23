@@ -56,3 +56,17 @@ func TestUnknownPlayerDataFields_JSONオブジェクトでなければエラー(
 	// Then
 	assert.Error(t, err)
 }
+
+func TestPlayerDataRequest_ToUsecase_チーム情報をチームコードとともに渡す(t *testing.T) {
+	// Given
+	var request playerDataRequest
+	require.NoError(t, json.Unmarshal([]byte(`{"team":{"name":"チーム名","color":"green","code":"AB12CD"}}`), &request))
+
+	// When
+	payload := request.toUsecase()
+
+	// Then
+	assert.Equal(t, "チーム名", payload.Team.Name)
+	assert.Equal(t, "green", payload.Team.Color)
+	assert.Equal(t, "AB12CD", payload.Team.Code)
+}
