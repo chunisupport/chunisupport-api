@@ -249,3 +249,54 @@ func TestBuildRatingSlots_本枠不足時は全件本枠で候補なし(t *testi
 	assert.Len(t, result.Main, 1)
 	assert.Empty(t, result.Candidates)
 }
+
+func TestFindCandidatesAboveMainThreshold(t *testing.T) {
+	main := []RatingSlotRecord{
+		{ChartID: 1, Score: 1_009_000, ChartConst: 15},
+		{ChartID: 2, Score: 1_000_000, ChartConst: 15},
+	}
+	tests := []struct {
+		name       string
+		main       []RatingSlotRecord
+		candidates []RatingSlotRecord
+		expected   []int
+	}{
+		{
+			name:       "本枠下限を上回る候補だけを返す",
+			main:       main,
+			candidates: []RatingSlotRecord{{ChartID: 3, Score: 1_005_000, ChartConst: 15}, {ChartID: 4, Score: 990_000, ChartConst: 15}},
+			expected:   []int{3},
+		},
+		{
+			name:       "本枠下限と同値なら返さない",
+			main:       main,
+			candidates: []RatingSlotRecord{{ChartID: 3, Score: 1_000_000, ChartConst: 15}},
+			expected:   nil,
+		},
+		{
+			name:       "並び替え用レートで比較するため1008999点はSSS+と同値として扱う",
+			main:       []RatingSlotRecord{{ChartID: 1, Score: 1_009_000, ChartConst: 15}},
+			candidates: []RatingSlotRecord{{ChartID: 3, Score: 1_008_999, ChartConst: 15}},
+			expected:   nil,
+		},
+		{
+			name:       "本枠が空なら比較しない",
+			main:       nil,
+			candidates: []RatingSlotRecord{{ChartID: 3, Score: 1_009_000, ChartConst: 15}},
+			expected:   nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// When
+			result := FindCandidatesAboveMainThreshold(tt.main, tt.candidates)
+
+			// Then
+			var chartIDs []int
+			for _, record := range result {
+				chartIDs = append(chartIDs, record.ChartID)
+			}
+			assert.Equal(t, tt.expected, chartIDs)
+		})
+	}
+}
