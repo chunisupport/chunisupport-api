@@ -8,6 +8,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -90,4 +91,51 @@ func TestValidateFullRecordSlots_本枠は1位から連続している必要が�
 			})
 		}
 	}
+}
+
+func TestFindCandidatesAboveMainSlot_本枠下限を上回る候補枠を枠ごとに返す(t *testing.T) {
+	// Given: ベスト枠と新曲枠の下限はどちらも定数15.0の1,000,000点（単曲レート15.00）。
+	masters := newApplyScoresTestMasters()
+	for id := 1; id <= 6; id++ {
+		masters.chartsByID[id] = entity.PlayerDataChart{ID: id, Const: chartconstant.ChartConstant(15.0)}
+	}
+	masters.chartsByID[7] = entity.PlayerDataChart{ID: 7, Const: chartconstant.ChartConstant(15.0), IsConstUnknown: true}
+	record := func(chartID, slotID, order, score int) repository.PlayerRecordForUpsert {
+		return repository.PlayerRecordForUpsert{ChartID: chartID, State: repository.PlayerRecordState{Score: score, SlotID: slotID, SlotOrder: &order}}
+	}
+	records := []repository.PlayerRecordForUpsert{
+		record(1, 2, 1, 1_000_000),
+		record(2, 3, 1, 1_000_000),
+		record(3, 4, 1, 1_005_000), // ベスト候補: 下限超過
+		record(4, 4, 2, 990_000),   // ベスト候補: 正常
+		record(5, 5, 1, 1_000_000), // 新曲候補: 同値は正常
+		record(6, 5, 2, 1_007_500), // 新曲候補: 下限超過
+		record(7, 5, 3, 1_009_000), // 新曲候補: 定数不明のため比較しない
+	}
+
+	// When
+	result := findCandidatesAboveMainSlot(records, masters)
+
+	// Then
+	assert.Equal(t, map[string][]int{"best_candidate": {3}, "new_candidate": {6}}, result)
+}
+
+func TestFindCandidatesAboveMainSlot_定数不明の本枠は下限の計算に使わない(t *testing.T) {
+	// Given: 定数不明の本枠を下限に含めると、正常な候補枠を誤って検出してしまう。
+	masters := newApplyScoresTestMasters()
+	masters.chartsByID[1] = entity.PlayerDataChart{ID: 1, Const: chartconstant.ChartConstant(15.0)}
+	masters.chartsByID[2] = entity.PlayerDataChart{ID: 2, Const: chartconstant.ChartConstant(1.0), IsConstUnknown: true}
+	masters.chartsByID[3] = entity.PlayerDataChart{ID: 3, Const: chartconstant.ChartConstant(14.0)}
+	order := 1
+	records := []repository.PlayerRecordForUpsert{
+		{ChartID: 1, State: repository.PlayerRecordState{Score: 1_000_000, SlotID: 2, SlotOrder: &order}},
+		{ChartID: 2, State: repository.PlayerRecordState{Score: 1_000_000, SlotID: 2, SlotOrder: new(2)}},
+		{ChartID: 3, State: repository.PlayerRecordState{Score: 1_000_000, SlotID: 4, SlotOrder: &order}},
+	}
+
+	// When
+	result := findCandidatesAboveMainSlot(records, masters)
+
+	// Then
+	assert.Empty(t, result)
 }
