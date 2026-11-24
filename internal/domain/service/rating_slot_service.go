@@ -32,7 +32,7 @@ func BuildRatingSlots(records []RatingSlotRecord, mainLimit, candidateLimit int)
 	}
 
 	candidates := make([]RatingSlotRecord, 0, len(sorted)-mainCount)
-	mainThresholdRating := calcSingleRatingHundredths(sorted[mainCount-1].Score, sorted[mainCount-1].ChartConst)
+	mainThresholdRating := calcSlotSortRatingHundredths(sorted[mainCount-1].Score, sorted[mainCount-1].ChartConst)
 	for _, record := range sorted[mainCount:] {
 		if record.Score >= constants.SSSPlusScore {
 			continue

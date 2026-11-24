@@ -12,7 +12,7 @@ func TestBuildRatingSlots_本枠と候補枠を決定的に選出する(t *testi
 	for i := 1; i <= 33; i++ {
 		score := uint32(1_000_000)
 		if i <= 30 {
-			score = 1_008_999
+			score = 1_008_998
 		}
 		records = append(records, RatingSlotRecord{
 			ChartID:       i,
@@ -33,6 +33,22 @@ func TestBuildRatingSlots_本枠と候補枠を決定的に選出する(t *testi
 		result.Candidates[1].ChartID,
 		result.Candidates[2].ChartID,
 	})
+}
+
+func TestBuildRatingSlots_本枠下限が1008999点なら同定数の譜面は候補外(t *testing.T) {
+	// Given: 同じ譜面定数で、1,008,999点の譜面が本枠の下限になる。
+	records := []RatingSlotRecord{
+		{ChartID: 1, Score: 1_008_999, ChartConst: 15, OfficialIndex: 1},
+		{ChartID: 2, Score: 1_008_000, ChartConst: 15, OfficialIndex: 2},
+	}
+
+	// When
+	result := BuildRatingSlots(records, 1, 10)
+
+	// Then: 2曲目はSSS+を取っても並べ替え用レートが本枠下限と同値になる。
+	require.Len(t, result.Main, 1)
+	assert.Equal(t, 1, result.Main[0].ChartID)
+	assert.Empty(t, result.Candidates)
 }
 
 func TestBuildRatingSlots_SSSPlus済みと仮定しても本枠に入れない譜面は候補外(t *testing.T) {
