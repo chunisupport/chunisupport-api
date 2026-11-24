@@ -13,20 +13,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestSavePlayerDataSQLite_差分書き込み(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+	testRecordWrites(t, db)
+}
+
 // 本番と同じON UPDATEを持つMySQLでも、SQLiteと共通の保存契約を検証します。
-func TestSavePlayerData_差分書き込み(t *testing.T) {
-	t.Run("SQLite", func(t *testing.T) {
-		db := setupTestDB(t)
-		defer db.Close()
-		testRecordWrites(t, db)
-	})
-	t.Run("MySQL", func(t *testing.T) {
-		db := mysqltest.NewDatabase(t, "")
-		db.SetMaxOpenConns(1)
-		_, err := db.Exec("SET timestamp = ?", time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC).Unix())
-		require.NoError(t, err)
-		testRecordWrites(t, db)
-	})
+func TestSavePlayerDataMySQL_差分書き込み(t *testing.T) {
+	db := mysqltest.NewDatabase(t, "")
+	db.SetMaxOpenConns(1)
+	_, err := db.Exec("SET timestamp = ?", time.Date(2026, 11, 12, 0, 0, 0, 0, time.UTC).Unix())
+	require.NoError(t, err)
+	testRecordWrites(t, db)
 }
 
 func setupRecordWriteTables(t *testing.T, db *sqlx.DB) {
