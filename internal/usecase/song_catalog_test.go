@@ -124,7 +124,7 @@ func newUserUsecaseWithSongCatalogForTest(
 		nil, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo,
 		nil, nil, masterProvider, nil, nil, nil, nil, nil,
 		&stubSongCatalogProvider{catalog: songcatalog.New(1, songs, worldsendSongs, nil)},
-		nil, nil, nil,
+		nil, nil, nil, nil,
 	)
 }
 

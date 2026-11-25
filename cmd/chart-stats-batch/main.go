@@ -63,6 +63,7 @@ func run() int {
 		db.NewAdvisoryLockProvider(database),
 		infrarepo.NewChartStatsBatchJobRepository(database),
 		usecase.NewChartStatsBatchUsecase(infrarepo.NewChartStatsBatchRepository(database)),
+		nil,
 	)
 	acquired, err := jobUsecase.RunFromCLI(ctx)
 	if err != nil {

@@ -109,7 +109,7 @@ func TestCourseUsecase_ConcurrentMutationsPreserveIndependentFields(t *testing.T
 			var release sync.Once
 			unblock := func() { release.Do(func() { close(repo.release) }) }
 			defer unblock()
-			uc := NewCourseUsecase(nil, repo, repo, nil, nil)
+			uc := NewCourseUsecase(nil, repo, repo, nil, nil, nil)
 			edit := func() error {
 				output, err := uc.Update(context.Background(), id.String(), UpdateCourseInput{Name: "変更後", Class: "extra"})
 				if err == nil && (output.Name != "変更後" || output.Class != "extra") {
@@ -199,7 +199,7 @@ func TestCourseUsecase_TransactionFailureDoesNotReturnSuccess(t *testing.T) {
 			require.NoError(t, err)
 			repo := &courseRepositoryStub{displayIDCourse: &entity.Course{DisplayID: id, OfficialIdx: "50020", Name: "コース", CourseClassID: 1}}
 			tm := courseFailingTransactionManager{err: context.Canceled, afterCallback: tt.afterCallback}
-			uc := NewCourseUsecase(nil, tm, repo, nil, nil)
+			uc := NewCourseUsecase(nil, tm, repo, nil, nil, nil)
 
 			// When
 			var output *CourseOutput

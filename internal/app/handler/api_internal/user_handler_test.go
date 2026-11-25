@@ -197,9 +197,10 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 	h := api_internal.NewUserHandler(mockUsecase)
 	now := time.Date(2026, 4, 18, 12, 34, 56, 0, time.UTC)
 
-	t.Run("正常系: updated_at を返す", func(t *testing.T) {
+	t.Run("正常系: updated_at と stats_revision を返す", func(t *testing.T) {
 		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&usecase.UserUpdatedAtOutput{
-			UpdatedAt: &now,
+			UpdatedAt:     &now,
+			StatsRevision: 42,
 		}, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
@@ -216,12 +217,14 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 		if assert.NotNil(t, body.UpdatedAt) {
 			assert.True(t, now.Equal(*body.UpdatedAt))
 		}
+		assert.Equal(t, uint64(42), body.StatsRevision)
 		mockUsecase.AssertExpectations(t)
 	})
 
-	t.Run("プレイヤー未連携時は null を返す", func(t *testing.T) {
+	t.Run("プレイヤー未連携時は null と stats_revision を返す", func(t *testing.T) {
 		mockUsecase.On("GetUserUpdatedAt", mock.Anything, "testuser", (*entity.User)(nil)).Return(&usecase.UserUpdatedAtOutput{
-			UpdatedAt: nil,
+			UpdatedAt:     nil,
+			StatsRevision: 7,
 		}, nil).Once()
 
 		req := httptest.NewRequest(http.MethodGet, "/users/testuser/updated-at", nil)
@@ -234,7 +237,7 @@ func TestUserHandler_GetUserUpdatedAt(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, http.StatusOK, rec.Code)
 		// キーの存在と null をまとめて固定する（omitempty 付与やキー欠落の退行を検知する）。
-		assert.JSONEq(t, `{"updated_at":null}`, rec.Body.String())
+		assert.JSONEq(t, `{"updated_at":null,"stats_revision":7}`, rec.Body.String())
 		mockUsecase.AssertExpectations(t)
 	})
 

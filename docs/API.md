@@ -3249,13 +3249,14 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: Firebase Bearer (任意)
 - **レートリミット**: 認証なしで1分間60回/IP
 - **パスパラメータ**: `username` - 対象ユーザーのユーザー名
-- **レスポンス**: `profile.updated_at` と `rating/record` 系の元になるレコード最終更新日時のうち、新しい方のみを返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `updated_at` が `null` になります。
+- **レスポンス**: `profile.updated_at` と `rating/record` 系の元になるレコード最終更新日時のうち新しい方と、上位%表示に使っている公開中の統計変更世代 `stats_revision` を返します。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。プレイヤー未連携の場合は `200 OK` で `updated_at` が `null` になります。
 
 #### レスポンス例
 
 ```json
 {
-  "updated_at": "2026-04-18T12:34:56Z"
+  "updated_at": "2026-04-18T12:34:56Z",
+  "stats_revision": 42
 }
 ```
 
@@ -3263,7 +3264,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 ```json
 {
-  "updated_at": null
+  "updated_at": null,
+  "stats_revision": 42
 }
 ```
 
@@ -3272,6 +3274,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
 | `updated_at` | string \| null | `players.updated_at` と `player_records` / `player_worldsend_records` の `updated_at` の最大値 (ISO8601)。プレイヤー未連携の場合は `null` |
+| `stats_revision` | integer | 公開中の上位%統計スナップショットの変更世代。譜面統計バッチの再集計ごとに変わり、未集計・未取得時は `0`。フロントエンドのレコードキャッシュ更新判定に使用する |
 
 ### GET `/internal/users/:username/rating`
 - **認証**: Firebase Bearer (任意)
@@ -3863,6 +3866,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "class": "1",
       "is_played": true,
       "score": 3029000,
+      "top_percent": 3.42,
       "is_clear": true,
       "combo_lamp": "FULL COMBO",
       "updated_at": "2026-07-10T08:00:00Z"
@@ -3938,6 +3942,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `const` | number | 譜面定数 |
 | `is_const_unknown` | boolean | 譜面定数が不明か |
 | `score` | number | スコア |
+| `top_percent` | number \| null | ChuniSupport内（`ALL`帯・全プレイ記録）での上位%（小数点以下2桁、`0.01`〜`100.00`）。未プレイまたは統計未集計時は `null`（内部API `/internal` のみ） |
 | `justice_count` | number \| null | JUSTICE数。スコアが1,010,000の場合はノーツ数不明でも `0`。それ以外はALL JUSTICEかつノーツ数がある場合のみ `round(notes * (1010000 - score) / 10000)` で算出し、条件を満たさない場合は `null` |
 | `rating` | number | 単曲レーティング（譜面定数とスコアから計算） |
 | `overpower` | number | 単曲OVER POWER（譜面定数・スコア・コンボランプから計算） |
@@ -3961,6 +3966,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `attribute` | string \| null | WORLD'S END 属性 |
 | `notes` | number \| null | ノーツ数 |
 | `score` | number | スコア |
+| `top_percent` | number \| null | ChuniSupport内（`ALL`帯・全プレイ記録）での上位%（小数点以下2桁、`0.01`〜`100.00`）。未プレイまたは統計未集計時は `null`（内部API `/internal` のみ） |
 | `justice_count` | number \| null | JUSTICE数。スコアが1,010,000の場合はノーツ数不明でも `0`。それ以外はALL JUSTICEかつノーツ数がある場合のみ `round(notes * (1010000 - score) / 10000)` で算出し、条件を満たさない場合は `null` |
 | `img` | string | 楽曲画像ID |
 | `clear_lamp` | string \| null | クリアランプ名称。未プレイ補完データは `null` |
@@ -6606,6 +6612,7 @@ interface PlayerRecordDTO {
   const: number;
   is_const_unknown: boolean;
   score: number;
+  top_percent: number | null;
   justice_count: number | null;
   rating: number;
   overpower: number;
@@ -6639,6 +6646,7 @@ interface WorldsendRecordDTO {
   attribute: string | null;       // WORLD'S END 属性（光、蔵、改、狂、etc.）
   notes: number | null;
   score: number;
+  top_percent: number | null;
   justice_count: number | null;
   img: string;
   clear_lamp: string | null;
@@ -6653,6 +6661,7 @@ interface CourseRecordDTO {
   class: string;
   is_played: boolean;
   score: number;
+  top_percent: number | null;
   is_clear: boolean;
   combo_lamp: string | null;
   updated_at: string | null;

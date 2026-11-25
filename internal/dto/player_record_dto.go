@@ -22,6 +22,7 @@ type PlayerRecordDTO struct {
 	Const            chartconstant.ChartConstant `json:"const"`
 	IsConstUnknown   bool                        `json:"is_const_unknown"`
 	Score            uint32                      `json:"score"`
+	TopPercent       *float64                    `json:"top_percent"`
 	JusticeCount     *int                        `json:"justice_count"`
 	Rating           float64                     `json:"rating"`
 	Overpower        float64                     `json:"overpower"`

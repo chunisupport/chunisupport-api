@@ -27,7 +27,7 @@ func TestCourseTracksMySQL_構成と現在の候補を取得する(t *testing.T)
 		t.Setenv("TEST_MYSQL_DSN", cfg.FormatDSN())
 	}
 	db := mysqltest.NewDatabase(t, "")
-	uc := usecase.NewCourseUsecase(db, transaction.NewTransactionManager(db), infrarepo.NewCourseRepository(db), nil, nil)
+	uc := usecase.NewCourseUsecase(db, transaction.NewTransactionManager(db), infrarepo.NewCourseRepository(db), nil, nil, nil)
 	const courseID = "aaaabbbbccccdddd"
 	const emptyCourseID = "aaaabbbbcccc0000"
 	_, err := db.ExecContext(ctx, `

@@ -20,6 +20,7 @@ type WorldsendRecordDTO struct {
 	Attribute    *string    `json:"attribute"`
 	Notes        *int       `json:"notes"`
 	Score        uint32     `json:"score"`
+	TopPercent   *float64   `json:"top_percent"`
 	JusticeCount *int       `json:"justice_count"`
 	Img          string     `json:"img"`
 	ClearLamp    *string    `json:"clear_lamp"`

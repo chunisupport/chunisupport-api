@@ -18,7 +18,7 @@ import (
 func TestCourseTracksMySQL_同名のWorldsend譜面を別々に保存する(t *testing.T) {
 	ctx := context.Background()
 	db := mysqltest.NewDatabase(t, "")
-	uc := usecase.NewCourseUsecase(db, transaction.NewTransactionManager(db), infrarepo.NewCourseRepository(db), nil, nil)
+	uc := usecase.NewCourseUsecase(db, transaction.NewTransactionManager(db), infrarepo.NewCourseRepository(db), nil, nil, nil)
 	const courseID = "aaaabbbbccccdddd"
 	_, err := db.ExecContext(ctx, "INSERT INTO courses (display_id, official_idx, name, course_class_id) VALUES (?, '100', '検証コース', 1)", courseID)
 	require.NoError(t, err)

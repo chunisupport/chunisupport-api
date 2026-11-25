@@ -153,7 +153,7 @@ func toCourseRecordDTO(value *usecase.CourseRecordOutput) *dto.CourseRecordDTO {
 	if value == nil {
 		return nil
 	}
-	return &dto.CourseRecordDTO{DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsPlayed: value.IsPlayed, Score: value.Score, IsClear: value.IsClear, ComboLamp: value.ComboLamp, UpdatedAt: value.UpdatedAt}
+	return &dto.CourseRecordDTO{DisplayID: value.DisplayID, Idx: value.Idx, Name: value.Name, Class: value.Class, IsPlayed: value.IsPlayed, Score: value.Score, TopPercent: value.TopPercent, IsClear: value.IsClear, ComboLamp: value.ComboLamp, UpdatedAt: value.UpdatedAt}
 }
 func toCourseRecordDTOs(values []*usecase.CourseRecordOutput) []*dto.CourseRecordDTO {
 	result := make([]*dto.CourseRecordDTO, 0, len(values))

@@ -43,6 +43,12 @@ CREATE TABLE `chart_best_slot_stats_by_rating_band` (
   CONSTRAINT `chart_best_slot_stats_by_rating_band_chk_2` CHECK (((`best_player_percentage` is null) or (`best_player_percentage` between 0 and 100))),
   CONSTRAINT `chart_best_slot_stats_by_rating_band_chk_3` CHECK ((((`eligible_player_count` = 0) and (`best_player_percentage` is null)) or ((`eligible_player_count` > 0) and (`best_player_percentage` is not null))))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `chart_score_percentiles` (
+  `chart_id` mediumint unsigned NOT NULL,
+  `thresholds` blob NOT NULL,
+  PRIMARY KEY (`chart_id`),
+  CONSTRAINT `fk_chart_score_percentiles_chart` FOREIGN KEY (`chart_id`) REFERENCES `charts` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `chart_stats_batch_jobs` (
   `id` binary(16) NOT NULL,
   `trigger_type` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -85,6 +91,12 @@ CREATE TABLE `chart_stats_by_rating_band` (
   KEY `rating_band_id` (`rating_band_id`),
   CONSTRAINT `chart_stats_by_rating_band_ibfk_1` FOREIGN KEY (`chart_id`) REFERENCES `charts` (`id`) ON DELETE CASCADE,
   CONSTRAINT `chart_stats_by_rating_band_ibfk_2` FOREIGN KEY (`rating_band_id`) REFERENCES `rating_bands` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `chart_stats_revision` (
+  `id` tinyint unsigned NOT NULL,
+  `revision` bigint unsigned NOT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `chk_chart_stats_revision_singleton` CHECK ((`id` = 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `charts` (
   `id` mediumint unsigned NOT NULL AUTO_INCREMENT,
@@ -138,6 +150,12 @@ CREATE TABLE `course_classes` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_course_classes_name` (`name`),
   UNIQUE KEY `uq_course_classes_sort_order` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `course_score_percentiles` (
+  `course_id` mediumint unsigned NOT NULL,
+  `thresholds` blob NOT NULL,
+  PRIMARY KEY (`course_id`),
+  CONSTRAINT `fk_course_score_percentiles_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `course_stats_by_rating_band` (
   `course_id` mediumint unsigned NOT NULL,
@@ -622,6 +640,12 @@ CREATE TABLE `versions` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`),
   UNIQUE KEY `uq_versions_short_name` (`short_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `worldsend_chart_score_percentiles` (
+  `worldsend_chart_id` mediumint unsigned NOT NULL,
+  `thresholds` blob NOT NULL,
+  PRIMARY KEY (`worldsend_chart_id`),
+  CONSTRAINT `fk_worldsend_chart_score_percentiles_chart` FOREIGN KEY (`worldsend_chart_id`) REFERENCES `worldsend_charts` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `worldsend_chart_stats_by_rating_band` (
   `worldsend_chart_id` mediumint unsigned NOT NULL,

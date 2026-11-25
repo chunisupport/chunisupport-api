@@ -40,6 +40,7 @@ type CourseRecordOutput struct {
 	IsClear          bool
 	ComboLamp        *string
 	UpdatedAt        *time.Time
+	TopPercent       *float64
 }
 type CourseRecordResult struct {
 	Records   []*CourseRecordOutput
@@ -61,15 +62,17 @@ type CourseUsecase interface {
 }
 
 type courseUsecase struct {
-	db             repository.Executor
-	tm             TransactionManager
-	repo           repository.CourseRepository
-	userRepo       repository.UserRepository
-	friendshipRepo repository.FriendshipRepository
+	db               repository.Executor
+	tm               TransactionManager
+	repo             repository.CourseRepository
+	userRepo         repository.UserRepository
+	friendshipRepo   repository.FriendshipRepository
+	scorePercentiles repository.ScorePercentileProvider
 }
 
-func NewCourseUsecase(db repository.Executor, tm TransactionManager, repo repository.CourseRepository, userRepo repository.UserRepository, friendshipRepo repository.FriendshipRepository) CourseUsecase {
-	return &courseUsecase{db: db, tm: tm, repo: repo, userRepo: userRepo, friendshipRepo: friendshipRepo}
+// NewCourseUsecase は CourseUsecase を生成します。scorePercentiles が nil のときはコース記録に上位%を付けません。
+func NewCourseUsecase(db repository.Executor, tm TransactionManager, repo repository.CourseRepository, userRepo repository.UserRepository, friendshipRepo repository.FriendshipRepository, scorePercentiles repository.ScorePercentileProvider) CourseUsecase {
+	return &courseUsecase{db: db, tm: tm, repo: repo, userRepo: userRepo, friendshipRepo: friendshipRepo, scorePercentiles: scorePercentiles}
 }
 
 func (u *courseUsecase) List(ctx context.Context, includeDeleted bool) ([]*CourseOutput, error) {
@@ -265,10 +268,11 @@ func (u *courseUsecase) GetUserRecords(ctx context.Context, username string, req
 	if err != nil {
 		return nil, err
 	}
+	percentiles := loadScorePercentiles(ctx, u.scorePercentiles)
 	result := &CourseRecordResult{Records: make([]*CourseRecordOutput, 0, len(records))}
 	var recordUpdatedAt *time.Time
 	for _, record := range records {
-		item := toCourseRecordOutput(record)
+		item := toCourseRecordOutputWithTopPercent(record, percentiles)
 		result.Records = append(result.Records, item)
 		if item.UpdatedAt != nil && (recordUpdatedAt == nil || item.UpdatedAt.After(*recordUpdatedAt)) {
 			recordUpdatedAt = item.UpdatedAt

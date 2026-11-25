@@ -55,7 +55,10 @@ func (h *UserHandler) GetUserUpdatedAt(c *echo.Context) error {
 		return h.handleUserProfileError(c.Request().Context(), err, username, "user updated at")
 	}
 
-	return c.JSON(http.StatusOK, &dto_internal.UserUpdatedAtDTO{UpdatedAt: result.UpdatedAt})
+	return c.JSON(http.StatusOK, &dto_internal.UserUpdatedAtDTO{
+		UpdatedAt:     result.UpdatedAt,
+		StatsRevision: result.StatsRevision,
+	})
 }
 
 // GetUserRating はユーザー名をキーにレーティング枠のみを返すハンドラです。
@@ -248,7 +251,11 @@ func ToPlayerRecordDTOs(values []*usecase.PlayerRecordOutput) []*dto.PlayerRecor
 		if value == nil {
 			result = append(result, nil)
 		} else {
-			result = append(result, dto.ToPlayerRecordDTO(value.PlayerRecord))
+			recordDTO := dto.ToPlayerRecordDTO(value.PlayerRecord)
+			if recordDTO != nil {
+				recordDTO.TopPercent = value.TopPercent
+			}
+			result = append(result, recordDTO)
 		}
 	}
 	return result
@@ -259,7 +266,11 @@ func toWorldsendRecordDTOs(values []*usecase.WorldsendRecordOutput) []*dto.World
 		if value == nil {
 			result = append(result, nil)
 		} else {
-			result = append(result, dto.ToWorldsendRecordDTO(value.PlayerWorldsendRecord))
+			recordDTO := dto.ToWorldsendRecordDTO(value.PlayerWorldsendRecord)
+			if recordDTO != nil {
+				recordDTO.TopPercent = value.TopPercent
+			}
+			result = append(result, recordDTO)
 		}
 	}
 	return result
@@ -334,6 +345,9 @@ func toUserWorldsendSongRecordDTO(value *usecase.UserWorldsendSongRecordOutput) 
 	var record *dto.WorldsendRecordDTO
 	if value.Worldsend != nil {
 		record = dto.ToWorldsendRecordDTO(value.Worldsend.PlayerWorldsendRecord)
+		if record != nil {
+			record.TopPercent = value.Worldsend.TopPercent
+		}
 	}
 	return &dto_internal.UserWorldsendSongRecordDTO{Worldsend: record, Meta: &dto_internal.UserSongRecordMetaDTO{UpdatedAt: value.UpdatedAt}}
 }

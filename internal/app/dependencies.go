@@ -89,8 +89,9 @@ type routerDependencies struct {
 	apiTokenUsecase                    usecase.APITokenUsecase
 	maintenanceStateProvider           usecase.MaintenanceStateProvider
 	// batchJobs はサーバー停止時に DB 接続を閉じる前に完了を待つバックグラウンド処理です。
-	batchJobs           []backgroundBatchJobs
-	songCatalogProvider *infra.SongCatalogProvider
+	batchJobs               []backgroundBatchJobs
+	songCatalogProvider     *infra.SongCatalogProvider
+	scorePercentileProvider *infra.ScorePercentileProvider
 }
 
 // buildRouterDependencies は Repository・Usecase・Handler を構築します。
@@ -124,6 +125,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 	bestSlotRankingQueryService := infra.NewBestSlotRankingQueryService(db)
 	overpowerDenominatorProvider := infra.NewOverpowerDenominatorProvider(db)
 	songCatalogProvider := infra.NewSongCatalogProvider(db)
+	scorePercentileProvider := infra.NewScorePercentileProvider(db)
 	userUpdatedAtQuery := infra.NewUserUpdatedAtQueryService()
 	chunirecQuery := infra.NewChunirecQueryService(db)
 	adminUserStatisticsQuery := infra.NewAdminUserStatisticsQueryService(db)
@@ -144,10 +146,18 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 	userUsecase := usecase.NewUserUsecase(
 		db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, friendshipRepo,
 		firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery, songCatalogProvider, courseRepo, tm, goalRepo,
+		scorePercentileProvider,
+	)
+	// 公開API v1 は top_percent を返さないため、上位%スナップショットの初回構築待ちや不要な算出を避ける。
+	v1UserUsecase := usecase.NewUserUsecase(
+		db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterCache, friendshipRepo,
+		firebaseUserDeleter, playerLockedSongRepo, overpowerDenominatorProvider, userUpdatedAtQuery, songCatalogProvider, courseRepo, tm, goalRepo,
+		nil,
 	)
 	chunirecUsecase := usecase.NewChunirecUsecase(db, userRepo, friendshipRepo, chunirecQuery)
 	playerDataUsecase := usecase.NewPlayerDataUsecase(tm, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, honorRepo, playerDataRepo, playerLockedSongRepo, masterCache, scoreHistoryRepo, courseRepo)
-	courseUsecase := usecase.NewCourseUsecase(db, tm, courseRepo, userRepo, friendshipRepo)
+	courseUsecase := usecase.NewCourseUsecase(db, tm, courseRepo, userRepo, friendshipRepo, scorePercentileProvider)
+	v1CourseUsecase := usecase.NewCourseUsecase(db, tm, courseRepo, userRepo, friendshipRepo, nil)
 	scoreHistoryUsecase := usecase.NewScoreHistoryUsecase(db, userRepo, songRepo, worldsendChartRepo, courseRepo, scoreHistoryRepo, friendshipRepo, masterCache)
 	playerMetricHistoryUsecase := usecase.NewPlayerMetricHistoryUsecase(db, userRepo, playerMetricHistoryQuery, friendshipRepo)
 	temporaryPlayerDataRepo := infra.NewTemporaryPlayerDataRepository(info.TempDataMaxEntriesPerIP, cfg.TempData.MaxTotalMB*1024*1024)
@@ -200,6 +210,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 		infradb.NewAdvisoryLockProvider(db),
 		infra.NewChartStatsBatchJobRepository(db),
 		usecase.NewChartStatsBatchUsecase(infra.NewChartStatsBatchRepository(db)),
+		scorePercentileProvider,
 	)
 
 	// 許可ホストはフロントの CORS オリジンだけを使う。
@@ -257,11 +268,11 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 		ChartStatsBatch:       api_internal.NewChartStatsBatchHandler(chartStatsBatchJobUsecase),
 		V1Song:                api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		V1Worldsend:           api_v1.NewV1WorldsendHandler(worldsendUsecase, masterCache),
-		V1User:                api_v1.NewV1UserHandler(userUsecase),
+		V1User:                api_v1.NewV1UserHandler(v1UserUsecase),
 		V1Version:             api_v1.NewV1VersionHandler(masterDataUsecase),
 		ScoreHistory:          api_v1.NewScoreHistoryHandler(scoreHistoryUsecase),
 		MetricHistory:         api_v1.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
-		V1Course:              api_v1.NewV1CourseHandler(courseUsecase),
+		V1Course:              api_v1.NewV1CourseHandler(v1CourseUsecase),
 		V1CourseStats:         api_v1.NewCourseStatsHandler(courseStatsUsecase, chartStatsMasterProvider),
 		Chunirec:              chunirec.NewChunirecHandler(songUsecase, chunirecUsecase, masterCache, cfg.Location),
 		Reiwa:                 reiwa.NewReiwaHandler(songUsecase, worldsendUsecase, masterDataUsecase, masterCache),
@@ -275,6 +286,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 		maintenanceStateProvider:           systemMaintenanceUsecase,
 		batchJobs:                          []backgroundBatchJobs{songBatchJobUsecase, chartStatsBatchJobUsecase},
 		songCatalogProvider:                songCatalogProvider,
+		scorePercentileProvider:            scorePercentileProvider,
 	}, nil
 }
 

@@ -135,7 +135,7 @@ func newTestChartStatsBatchJobUsecase(
 	repo *fakeChartStatsBatchJobRepository,
 	runner *fakeChartStatsBatchRunner,
 ) *ChartStatsBatchJobUsecase {
-	uc := NewChartStatsBatchJobUsecase(backgroundCtx, lockProvider, repo, runner)
+	uc := NewChartStatsBatchJobUsecase(backgroundCtx, lockProvider, repo, runner, nil)
 	uc.now = func() time.Time { return chartStatsBatchJobNow }
 	return uc
 }

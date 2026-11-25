@@ -16,7 +16,7 @@ func newUserUsecaseForTest(
 	masterProvider userMasterProvider,
 	friendshipRepo repository.FriendshipRepository,
 ) UserUsecase {
-	return NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo, nil, nil, nil, nil, nil, nil, &userDeletionTransactionManagerStub{}, nil)
+	return NewUserUsecase(db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo, songRepo, worldsendChartRepo, masterProvider, friendshipRepo, nil, nil, nil, nil, nil, nil, &userDeletionTransactionManagerStub{}, nil, nil)
 }
 
 // newUserUsecaseWithOverpowerDenominatorForTest はOVER POWER随時計算だけを有効にした UserUsecase を作ります。
@@ -38,7 +38,7 @@ func newUserUsecaseWithOverpowerDenominatorForTest(
 		db, userRepo, playerRepo, playerRecordRepo, worldsendRecordRepo,
 		songRepo, worldsendChartRepo, masterProvider, friendshipRepo,
 		nil, playerLockedSongRepo, overpowerDenominatorProvider, nil, nil,
-		nil, nil, nil,
+		nil, nil, nil, nil,
 	)
 }
 
