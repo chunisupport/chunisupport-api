@@ -77,30 +77,32 @@ func TestRegisterRoutes_コース構成の一括更新(t *testing.T) {
 		{name: "不正な構成", token: "editor-token", body: `{"tracks":[]}`, status: 422, usecaseError: usecase.ErrInvalidCourseInput},
 		{name: "コースなし", token: "editor-token", body: `{"tracks":[]}`, status: 404, usecaseError: usecase.ErrCourseNotFound},
 	} {
-		t.Run(tt.name, func(t *testing.T) {
-			uc := &courseTracksUsecaseStub{resultErr: tt.usecaseError}
-			e := newCourseTrackTestRouter(uc)
-			req := httptest.NewRequest(http.MethodPut, "/internal/courses/0123456789abcdef/tracks", strings.NewReader(tt.body))
-			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
-			req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
-			rec := httptest.NewRecorder()
+		for _, prefix := range []string{"/internal", "/v1"} {
+			t.Run(prefix+"/"+tt.name, func(t *testing.T) {
+				uc := &courseTracksUsecaseStub{resultErr: tt.usecaseError}
+				e := newCourseTrackTestRouter(uc)
+				req := httptest.NewRequest(http.MethodPut, prefix+"/courses/0123456789abcdef/tracks", strings.NewReader(tt.body))
+				req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+				req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+				rec := httptest.NewRecorder()
 
-			e.ServeHTTP(rec, req)
+				e.ServeHTTP(rec, req)
 
-			require.Equal(t, tt.status, rec.Code, rec.Body.String())
-			assert.Len(t, uc.tracks, tt.tracks)
-			if tt.status == http.StatusNoContent {
-				require.NotNil(t, uc.tracks)
-			}
-			if tt.tracks == 3 {
-				filter := uc.tracks[1].Filter
-				require.NotNil(t, filter)
-				require.NotNil(t, filter.MinLevel)
-				assert.Equal(t, "14+", filter.MinLevel.String())
-				assert.Nil(t, filter.MaxLevel)
-				assert.Equal(t, []string{"ゲキマイ", "東方Project"}, filter.Genres)
-			}
-		})
+				require.Equal(t, tt.status, rec.Code, rec.Body.String())
+				assert.Len(t, uc.tracks, tt.tracks)
+				if tt.status == http.StatusNoContent {
+					require.NotNil(t, uc.tracks)
+				}
+				if tt.tracks == 3 {
+					filter := uc.tracks[1].Filter
+					require.NotNil(t, filter)
+					require.NotNil(t, filter.MinLevel)
+					assert.Equal(t, "14+", filter.MinLevel.String())
+					assert.Nil(t, filter.MaxLevel)
+					assert.Equal(t, []string{"ゲキマイ", "東方Project"}, filter.Genres)
+				}
+			})
+		}
 	}
 }
 

@@ -35,6 +35,11 @@ func (s *courseWriteUsecaseStub) Update(_ context.Context, id string, input usec
 	return &usecase.CourseOutput{ID: 42, DisplayID: id, Idx: "50020", Name: input.Name, Class: input.Class}, s.err
 }
 
+func (s *courseWriteUsecaseStub) ReplaceTracks(_ context.Context, _ string, _ []entity.CourseTrack) error {
+	s.called = true
+	return s.err
+}
+
 type courseWriteTokenStub struct{ stubAPITokenUsecase }
 
 func (s courseWriteTokenStub) Validate(ctx context.Context, token string) (*entity.User, *entity.APIToken, error) {
@@ -54,6 +59,7 @@ func TestRegisterRoutes_外部コース変更の権限(t *testing.T) {
 	}{
 		{"作成", http.MethodPost, "/v1/courses", `{"idx":"50020","name":"コース","class":"1"}`, http.StatusCreated},
 		{"編集", http.MethodPut, "/v1/courses/0123456789abcdef", `{"name":"コース","class":"1"}`, http.StatusOK},
+		{"構成のクリア", http.MethodPut, "/v1/courses/0123456789abcdef/tracks", `{"tracks":[]}`, http.StatusNoContent},
 	} {
 		for _, token := range []string{"", "invalid-token", "player-token", "editor-token", "admin-token", "read-editor-token", "read-admin-token"} {
 			t.Run(operation.name+"/"+token, func(t *testing.T) {
@@ -86,7 +92,9 @@ func TestRegisterRoutes_外部コース変更の権限(t *testing.T) {
 				// Then
 				require.Equal(t, wantStatus, rec.Code, rec.Body.String())
 				assert.Equal(t, allowed, uc.called)
-				if allowed {
+				if wantStatus == http.StatusNoContent {
+					assert.Empty(t, rec.Body.String())
+				} else if allowed {
 					assert.JSONEq(t, `{"id":"0123456789abcdef","idx":"50020","name":"コース","class":"1"}`, rec.Body.String())
 				}
 			})

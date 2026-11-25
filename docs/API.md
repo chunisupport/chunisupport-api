@@ -393,6 +393,7 @@ Content-Type: application/json
 | `/v1/courses/:id/stats` | GET | APIトークン | コース統計取得 |
 | `/v1/courses` | POST | APIトークン (`read_write`、ADMIN+) | コース追加 |
 | `/v1/courses/:id` | PUT | APIトークン (`read_write`、EDITOR+) | コース名称・クラス更新 |
+| `/v1/courses/:id/tracks` | PUT | APIトークン (`read_write`、EDITOR+) | コーストラック更新 |
 | `/v1/users/:username/records/courses` | GET | APIトークン | ユーザーのコースレコード取得 |
 | `/v1/master/versions` | GET | APIトークン | バージョン一覧取得 |
 | `/compat/chunirec/2.0/music/showall` | GET | APIトークン | chunirec互換：全楽曲一覧取得 |
@@ -6005,7 +6006,17 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   - 404 Not Found (`not_found`): コースが存在しない
   - 422 Unprocessable Entity (`validation_failed`): 入力や `id` の形式が不正、または未知の `class`
 
-`/v1` にはトラック更新用の書き込みエンドポイントはありません。トラックの更新は `PUT /internal/courses/:id/tracks` のみで行います。
+### PUT `/v1/courses/:id/tracks`
+- **認証**: `read_write` APIトークンかつEDITOR以上
+- **概要**: コースの3トラックを一括で置き換えます。`id` はコースの外部識別子です。
+- **リクエストボディ**: `{ "tracks": [ ... ] }`。トラック定義は [内部APIのトラック更新](#put-internalcoursesidtracks) と同一です。3要素を指定し、`track_no` の `1`〜`3` をそれぞれ1回ずつ含めます。`tracks: []` でトラック設定をクリアします。
+- **レスポンス**: 204 No Content
+- **主なエラー**:
+  - 400 Bad Request (`bad_request`): JSON構文不正、または未知のフィールド
+  - 401 Unauthorized: APIトークン未指定または無効
+  - 403 Forbidden (`forbidden`): `read` トークン、またはEDITOR以上の権限なし
+  - 404 Not Found (`not_found`): コースが存在しない、または論理削除済み
+  - 422 Unprocessable Entity (`validation_failed`): `id`、`tracks`、トラック定義、譜面、またはジャンルが不正
 
 ### GET `/v1/users/:username/records/courses`
 - **認証**: APIトークン必須
