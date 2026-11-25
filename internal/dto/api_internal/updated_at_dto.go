@@ -14,7 +14,8 @@ type CourseUpdatedAtDTO struct {
 	UpdatedAt *time.Time `json:"updated_at"`
 }
 
-// UserUpdatedAtDTO はユーザー関連データの updated_at のみを返す DTO です。
+// UserUpdatedAtDTO はユーザー関連データの updated_at と公開中の統計世代を返す DTO です。
 type UserUpdatedAtDTO struct {
-	UpdatedAt *time.Time `json:"updated_at"`
+	UpdatedAt     *time.Time `json:"updated_at"`
+	StatsRevision uint64     `json:"stats_revision"`
 }

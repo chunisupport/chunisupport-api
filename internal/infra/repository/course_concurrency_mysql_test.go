@@ -84,7 +84,7 @@ func TestCourseConcurrencyMySQL_MutationsPreserveIndependentFields(t *testing.T)
 			var release sync.Once
 			unblock := func() { release.Do(func() { close(repo.release) }) }
 			defer unblock()
-			uc := usecase.NewCourseUsecase(db, transaction.NewTransactionManager(db), repo, nil, nil)
+			uc := usecase.NewCourseUsecase(db, transaction.NewTransactionManager(db), repo, nil, nil, nil)
 			edit := func() error {
 				output, err := uc.Update(ctx, id, usecase.UpdateCourseInput{Name: "変更後", Class: "extra"})
 				if err == nil && (output.Name != "変更後" || output.Class != "extra") {

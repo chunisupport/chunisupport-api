@@ -9,6 +9,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/chartstatsbatch"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/scorepercentile"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
@@ -107,6 +108,13 @@ const (
 			average_score, median_score, player_count
 		) VALUES `
 	courseStatsInsertPlaceholder = "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+	chartPercentilesInsertPrefix = `
+		INSERT INTO chart_score_percentiles (chart_id, thresholds) VALUES `
+	worldsendChartPercentilesInsertPrefix = `
+		INSERT INTO worldsend_chart_score_percentiles (worldsend_chart_id, thresholds) VALUES `
+	coursePercentilesInsertPrefix = `
+		INSERT INTO course_score_percentiles (course_id, thresholds) VALUES `
+	scorePercentilesInsertPlaceholder = "(?, ?)"
 )
 
 type chartStatsBatchRepository struct {
@@ -203,7 +211,8 @@ func streamChartStatsBatchRows(ctx context.Context, tx *sqlx.Tx, query string, h
 	return rows.Err()
 }
 
-// ReplaceAll は4つの統計テーブルを削除してから snapshot を挿入し、単一トランザクションでコミットします。
+// ReplaceAll は統計テーブル（レーティング帯別統計4表・上位%境界3表）を削除してから snapshot を挿入し、
+// chart_stats_revision の更新と合わせて単一トランザクションでコミットします。
 // コミットまでは他のセッションから直前の統計が見え続け、失敗やキャンセル時はロールバックされます。
 func (r *chartStatsBatchRepository) ReplaceAll(ctx context.Context, snapshot *chartstatsbatch.Snapshot) (err error) {
 	tx, err := r.db.BeginTxx(ctx, nil)
@@ -223,22 +232,37 @@ func (r *chartStatsBatchRepository) ReplaceAll(ctx context.Context, snapshot *ch
 		"worldsend_chart_stats_by_rating_band",
 		"chart_best_slot_stats_by_rating_band",
 		"course_stats_by_rating_band",
+		"chart_score_percentiles",
+		"worldsend_chart_score_percentiles",
+		"course_score_percentiles",
 	} {
 		if _, err = tx.ExecContext(ctx, "DELETE FROM "+table); err != nil {
 			return fmt.Errorf("delete %s: %w", table, err)
 		}
 	}
-	if err = insertChartStatsBatchRows(ctx, tx, chartStatsInsertPrefix, chartStatsInsertPlaceholder, chartStatsRows(snapshot.ChartStats)); err != nil {
+	if err = insertChartStatsBatchRows(ctx, tx, chartStatsInsertPrefix, chartStatsInsertPlaceholder, info.ChartStatsBatchInsertChunkSize, chartStatsRows(snapshot.ChartStats)); err != nil {
 		return fmt.Errorf("insert chart stats: %w", err)
 	}
-	if err = insertChartStatsBatchRows(ctx, tx, worldsendChartStatsInsertPrefix, chartStatsInsertPlaceholder, chartStatsRows(snapshot.WorldsendChartStats)); err != nil {
+	if err = insertChartStatsBatchRows(ctx, tx, worldsendChartStatsInsertPrefix, chartStatsInsertPlaceholder, info.ChartStatsBatchInsertChunkSize, chartStatsRows(snapshot.WorldsendChartStats)); err != nil {
 		return fmt.Errorf("insert worldsend chart stats: %w", err)
 	}
-	if err = insertChartStatsBatchRows(ctx, tx, bestSlotStatsInsertPrefix, bestSlotStatsInsertPlaceholder, bestSlotStatsRows(snapshot.BestSlotStats)); err != nil {
+	if err = insertChartStatsBatchRows(ctx, tx, bestSlotStatsInsertPrefix, bestSlotStatsInsertPlaceholder, info.ChartStatsBatchInsertChunkSize, bestSlotStatsRows(snapshot.BestSlotStats)); err != nil {
 		return fmt.Errorf("insert best-slot stats: %w", err)
 	}
-	if err = insertChartStatsBatchRows(ctx, tx, courseStatsInsertPrefix, courseStatsInsertPlaceholder, courseStatsRows(snapshot.CourseStats)); err != nil {
+	if err = insertChartStatsBatchRows(ctx, tx, courseStatsInsertPrefix, courseStatsInsertPlaceholder, info.ChartStatsBatchInsertChunkSize, courseStatsRows(snapshot.CourseStats)); err != nil {
 		return fmt.Errorf("insert course stats: %w", err)
+	}
+	if err = insertChartStatsBatchRows(ctx, tx, chartPercentilesInsertPrefix, scorePercentilesInsertPlaceholder, info.ScorePercentileInsertChunkSize, scorePercentileRows(snapshot.ChartPercentiles)); err != nil {
+		return fmt.Errorf("insert chart score percentiles: %w", err)
+	}
+	if err = insertChartStatsBatchRows(ctx, tx, worldsendChartPercentilesInsertPrefix, scorePercentilesInsertPlaceholder, info.ScorePercentileInsertChunkSize, scorePercentileRows(snapshot.WorldsendChartPercentiles)); err != nil {
+		return fmt.Errorf("insert worldsend chart score percentiles: %w", err)
+	}
+	if err = insertChartStatsBatchRows(ctx, tx, coursePercentilesInsertPrefix, scorePercentilesInsertPlaceholder, info.ScorePercentileInsertChunkSize, scorePercentileRows(snapshot.CoursePercentiles)); err != nil {
+		return fmt.Errorf("insert course score percentiles: %w", err)
+	}
+	if err = TouchChartStatsRevision(ctx, tx); err != nil {
+		return fmt.Errorf("touch chart stats revision: %w", err)
 	}
 	return nil
 }
@@ -277,10 +301,22 @@ func courseStatsRows(stats []*entity.CourseStatsByRatingBand) [][]any {
 	return rows
 }
 
-// insertChartStatsBatchRows は複数行 VALUES で info.ChartStatsBatchInsertChunkSize 行ずつ挿入します。
-func insertChartStatsBatchRows(ctx context.Context, tx *sqlx.Tx, prefix, placeholder string, rows [][]any) error {
-	for start := 0; start < len(rows); start += info.ChartStatsBatchInsertChunkSize {
-		chunk := rows[start:min(start+info.ChartStatsBatchInsertChunkSize, len(rows))]
+func scorePercentileRows(entries []scorepercentile.Entry) [][]any {
+	rows := make([][]any, 0, len(entries))
+	for _, e := range entries {
+		// 空の境界列はヘッダーだけの1バイトになり、読み込み時の検証で全体の再構築が失敗するため保存しない。
+		if len(e.Thresholds) == 0 {
+			continue
+		}
+		rows = append(rows, []any{e.TargetID, scorepercentile.EncodeThresholds(e.Thresholds)})
+	}
+	return rows
+}
+
+// insertChartStatsBatchRows は複数行 VALUES で chunkSize 行ずつ挿入します。
+func insertChartStatsBatchRows(ctx context.Context, tx *sqlx.Tx, prefix, placeholder string, chunkSize int, rows [][]any) error {
+	for start := 0; start < len(rows); start += chunkSize {
+		chunk := rows[start:min(start+chunkSize, len(rows))]
 		query := prefix + strings.TrimSuffix(strings.Repeat(placeholder+",", len(chunk)), ",")
 		args := make([]any, 0, len(chunk)*len(chunk[0]))
 		for _, row := range chunk {

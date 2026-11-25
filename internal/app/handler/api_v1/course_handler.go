@@ -79,6 +79,10 @@ func (h *V1CourseHandler) Update(c *echo.Context) error {
 	return c.JSON(http.StatusOK, toV1CourseDTO(item))
 }
 
+func (h *V1CourseHandler) ReplaceTracks(c *echo.Context) error {
+	return handler.ReplaceCourseTracks(c, h.usecase)
+}
+
 func toV1CourseDTO(value *usecase.CourseOutput) *api_v1.V1CourseDTO {
 	if value == nil {
 		return nil

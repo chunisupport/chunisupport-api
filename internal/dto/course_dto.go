@@ -18,15 +18,16 @@ type CourseDTO struct {
 }
 
 type CourseRecordDTO struct {
-	DisplayID string     `json:"id"`
-	Idx       string     `json:"idx"`
-	Name      string     `json:"name"`
-	Class     string     `json:"class"`
-	IsPlayed  bool       `json:"is_played"`
-	Score     uint32     `json:"score"`
-	IsClear   bool       `json:"is_clear"`
-	ComboLamp *string    `json:"combo_lamp"`
-	UpdatedAt *time.Time `json:"updated_at"`
+	DisplayID  string     `json:"id"`
+	Idx        string     `json:"idx"`
+	Name       string     `json:"name"`
+	Class      string     `json:"class"`
+	IsPlayed   bool       `json:"is_played"`
+	Score      uint32     `json:"score"`
+	TopPercent *float64   `json:"top_percent"`
+	IsClear    bool       `json:"is_clear"`
+	ComboLamp  *string    `json:"combo_lamp"`
+	UpdatedAt  *time.Time `json:"updated_at"`
 }
 
 func ToCourseDTO(course *entity.Course, editor bool) *CourseDTO {

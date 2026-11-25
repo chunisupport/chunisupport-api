@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/config"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 	infra "github.com/chunisupport/chunisupport-api/internal/infra/repository"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v5"
@@ -324,7 +325,8 @@ func TestStartSongCatalogWatcher_コンテキスト終了で停止しWaitが戻�
 		require.NoError(t, database.Close())
 	})
 	ctx, cancel := context.WithCancel(context.Background())
-	watcher := startSongCatalogWatcher(ctx, infra.NewSongCatalogProvider(database))
+	songCatalog := infra.NewSongCatalogProvider(database)
+	watcher := startBackgroundWatcher(func() { songCatalog.Run(ctx, info.SongCatalogRevisionPollInterval) })
 
 	// When: サーバー停止と同じくコンテキストを終了する
 	cancel()

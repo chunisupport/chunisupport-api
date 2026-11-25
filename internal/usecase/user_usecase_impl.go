@@ -11,6 +11,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/scorepercentile"
 	"github.com/chunisupport/chunisupport-api/internal/domain/service"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
@@ -35,6 +36,7 @@ type userUsecase struct {
 	firebaseDeleter              FirebaseUserDeleter
 	transactionManager           TransactionManager
 	goalRepo                     repository.GoalRepository
+	scorePercentiles             repository.ScorePercentileProvider
 }
 
 type userMasterProvider interface {
@@ -56,6 +58,7 @@ type userProfilePlayerRecords struct {
 // courseRepo はユーザーレコードへコース記録を統合します。nil のときはコース記録を空にします。
 // transactionManager と goalRepo は、ユーザー物理削除で目標削除とユーザー削除を同じトランザクションに載せます。
 // goalRepo が nil のときは目標を削除せずに物理削除します。
+// scorePercentiles はレコードへ上位%を付ける共有キャッシュです。nil のときは上位%を付けません。
 func NewUserUsecase(
 	db repository.Executor,
 	userRepo repository.UserRepository,
@@ -74,6 +77,7 @@ func NewUserUsecase(
 	courseRepo repository.CourseRepository,
 	transactionManager TransactionManager,
 	goalRepo repository.GoalRepository,
+	scorePercentiles repository.ScorePercentileProvider,
 ) UserUsecase {
 	if firebaseDeleter == nil {
 		firebaseDeleter = noopFirebaseUserDeleter{}
@@ -97,6 +101,7 @@ func NewUserUsecase(
 		firebaseDeleter:              firebaseDeleter,
 		transactionManager:           transactionManager,
 		goalRepo:                     goalRepo,
+		scorePercentiles:             scorePercentiles,
 	}
 }
 
@@ -117,7 +122,7 @@ func (s *userUsecase) GetUserProfile(ctx context.Context, username string, reque
 	}, nil
 }
 
-// GetUserUpdatedAt はユーザーのプロフィールとレコードの updated_at のうち新しい方を返します。
+// GetUserUpdatedAt はユーザーのプロフィールとレコードの updated_at のうち新しい方と、公開中の統計世代を返します。
 func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, requester *entity.User) (*UserUpdatedAtOutput, error) {
 	if s.userUpdatedAtQuery != nil {
 		return s.getUserUpdatedAtByQuery(ctx, username, requester)
@@ -127,20 +132,22 @@ func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, req
 	if err != nil {
 		return nil, err
 	}
+	statsRevision := loadScorePercentiles(ctx, s.scorePercentiles).Revision()
 	if user.PlayerID == nil {
-		return &UserUpdatedAtOutput{UpdatedAt: nil}, nil
+		return &UserUpdatedAtOutput{UpdatedAt: nil, StatsRevision: statsRevision}, nil
 	}
 
 	player, err := s.playerRepo.FindByID(ctx, s.db, *user.PlayerID)
 	if err != nil {
 		if errors.Is(err, repository.ErrPlayerNotFound) {
-			return &UserUpdatedAtOutput{UpdatedAt: nil}, nil
+			return &UserUpdatedAtOutput{UpdatedAt: nil, StatsRevision: statsRevision}, nil
 		}
 		return nil, err
 	}
 	if player == nil {
 		return &UserUpdatedAtOutput{
-			UpdatedAt: nil,
+			UpdatedAt:     nil,
+			StatsRevision: statsRevision,
 		}, nil
 	}
 
@@ -158,7 +165,8 @@ func (s *userUsecase) GetUserUpdatedAt(ctx context.Context, username string, req
 	}
 
 	return &UserUpdatedAtOutput{
-		UpdatedAt: &latestUpdatedAt,
+		UpdatedAt:     &latestUpdatedAt,
+		StatsRevision: statsRevision,
 	}, nil
 }
 
@@ -180,8 +188,9 @@ func (s *userUsecase) getUserUpdatedAtByQuery(ctx context.Context, username stri
 	if !accessible {
 		return nil, ErrUserPrivate
 	}
+	statsRevision := loadScorePercentiles(ctx, s.scorePercentiles).Revision()
 	if result.PlayerUpdatedAt == nil {
-		return &UserUpdatedAtOutput{UpdatedAt: nil}, nil
+		return &UserUpdatedAtOutput{UpdatedAt: nil, StatsRevision: statsRevision}, nil
 	}
 
 	latestUpdatedAt := *result.PlayerUpdatedAt
@@ -189,7 +198,7 @@ func (s *userUsecase) getUserUpdatedAtByQuery(ctx context.Context, username stri
 		latestUpdatedAt = *result.RecordsUpdatedAt
 	}
 
-	return &UserUpdatedAtOutput{UpdatedAt: &latestUpdatedAt}, nil
+	return &UserUpdatedAtOutput{UpdatedAt: &latestUpdatedAt, StatsRevision: statsRevision}, nil
 }
 
 // GetUserProfileWithRecords はユーザー名をキーにプロファイルとレコードを一括取得します。
@@ -222,7 +231,8 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 	if err != nil {
 		return nil, err
 	}
-	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID)
+	percentiles := loadScorePercentiles(ctx, s.scorePercentiles)
+	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID, percentiles)
 	if err != nil {
 		return nil, err
 	}
@@ -240,6 +250,14 @@ func (s *userUsecase) GetUserProfileWithRecords(ctx context.Context, username st
 		All:           toPlayerRecordOutputs(playerRecords.all),
 		WorldsEnd:     toWorldsendRecordOutputs(worldsendRecords),
 		Courses:       courseRecords,
+	}
+	if percentiles != nil {
+		applyPlayerRecordTopPercents(recordsDTO.Best, percentiles)
+		applyPlayerRecordTopPercents(recordsDTO.BestCandidate, percentiles)
+		applyPlayerRecordTopPercents(recordsDTO.New, percentiles)
+		applyPlayerRecordTopPercents(recordsDTO.NewCandidate, percentiles)
+		applyPlayerRecordTopPercents(recordsDTO.All, percentiles)
+		applyWorldsendRecordTopPercents(recordsDTO.WorldsEnd, percentiles)
 	}
 
 	return &UserProfileWithRecordsOutput{
@@ -308,6 +326,12 @@ func (s *userUsecase) GetUserProfileRatingView(ctx context.Context, username str
 		BestCandidate: toPlayerRecordOutputs(slotMap["best_candidate"]),
 		New:           toPlayerRecordOutputs(slotMap["new"]),
 		NewCandidate:  toPlayerRecordOutputs(slotMap["new_candidate"]),
+	}
+	if percentiles := loadScorePercentiles(ctx, s.scorePercentiles); percentiles != nil {
+		applyPlayerRecordTopPercents(recordsDTO.Best, percentiles)
+		applyPlayerRecordTopPercents(recordsDTO.BestCandidate, percentiles)
+		applyPlayerRecordTopPercents(recordsDTO.New, percentiles)
+		applyPlayerRecordTopPercents(recordsDTO.NewCandidate, percentiles)
 	}
 
 	return &UserProfileRatingViewOutput{
@@ -476,7 +500,8 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 	if err != nil {
 		return nil, err
 	}
-	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID)
+	percentiles := loadScorePercentiles(ctx, s.scorePercentiles)
+	courseRecords, courseUpdatedAt, err := s.getUserProfileCourseRecords(ctx, *user.PlayerID, percentiles)
 	if err != nil {
 		return nil, err
 	}
@@ -486,15 +511,21 @@ func (s *userUsecase) GetUserProfileRecordView(ctx context.Context, username str
 		recordsUpdatedAt = player.Player.UpdatedAt
 	}
 
+	recordView := &UserRecordViewOutput{
+		UpdatedAt: recordsUpdatedAt,
+		All:       toPlayerRecordOutputs(playerRecords.all),
+		Worldsend: toWorldsendRecordOutputs(worldsendRecords),
+		Courses:   courseRecords,
+	}
+	if percentiles != nil {
+		applyPlayerRecordTopPercents(recordView.All, percentiles)
+		applyWorldsendRecordTopPercents(recordView.Worldsend, percentiles)
+	}
+
 	return &UserProfileRecordViewOutput{
-		Username: user.Username.String(),
-		Player:   player,
-		Records: &UserRecordViewOutput{
-			UpdatedAt: recordsUpdatedAt,
-			All:       toPlayerRecordOutputs(playerRecords.all),
-			Worldsend: toWorldsendRecordOutputs(worldsendRecords),
-			Courses:   courseRecords,
-		},
+		Username:  user.Username.String(),
+		Player:    player,
+		Records:   recordView,
 		UpdatedAt: &player.Player.UpdatedAt,
 	}, nil
 }
@@ -540,6 +571,7 @@ func (s *userUsecase) GetUserSongRecord(ctx context.Context, username string, re
 	}
 
 	response.Standard = toPlayerRecordOutputs(allRecords)
+	applyPlayerRecordTopPercents(response.Standard, loadScorePercentiles(ctx, s.scorePercentiles))
 	if latest := latestPlayerRecordUpdatedAt(allRecords); !latest.IsZero() {
 		response.UpdatedAt = &latest
 		response.Meta.UpdatedAt = &latest
@@ -581,6 +613,7 @@ func (s *userUsecase) GetUserWorldsendSongRecord(ctx context.Context, username s
 	}
 
 	response.Worldsend = toWorldsendRecordOutput(records[0])
+	applyWorldsendRecordTopPercents([]*WorldsendRecordOutput{response.Worldsend}, loadScorePercentiles(ctx, s.scorePercentiles))
 	if !records[0].UpdatedAt.IsZero() {
 		value := records[0].UpdatedAt
 		response.UpdatedAt = &value
@@ -871,7 +904,7 @@ func latestUserRecordUpdatedAt(values ...time.Time) time.Time {
 	return latest
 }
 
-func (s *userUsecase) getUserProfileCourseRecords(ctx context.Context, playerID int) ([]*CourseRecordOutput, time.Time, error) {
+func (s *userUsecase) getUserProfileCourseRecords(ctx context.Context, playerID int, percentiles *scorepercentile.Snapshot) ([]*CourseRecordOutput, time.Time, error) {
 	if s.courseRepo == nil {
 		return []*CourseRecordOutput{}, time.Time{}, nil
 	}
@@ -882,7 +915,7 @@ func (s *userUsecase) getUserProfileCourseRecords(ctx context.Context, playerID 
 	result := make([]*CourseRecordOutput, 0, len(records))
 	var latest time.Time
 	for _, record := range records {
-		result = append(result, toCourseRecordOutput(record))
+		result = append(result, toCourseRecordOutputWithTopPercent(record, percentiles))
 		if record.UpdatedAt.After(latest) {
 			latest = record.UpdatedAt
 		}

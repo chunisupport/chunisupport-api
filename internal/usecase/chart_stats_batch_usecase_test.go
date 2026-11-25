@@ -116,6 +116,10 @@ func TestChartStatsBatchUsecase_Execute_集計結果で統計テーブルを入�
 	require.Len(t, repo.replaced.BestSlotStats, 3)
 	assert.Equal(t, 1, repo.replaced.BestSlotStats[0].BestPlayerCount)
 	assert.Equal(t, 2, repo.replaced.BestSlotStats[0].EligiblePlayerCount)
+	require.Len(t, repo.replaced.ChartPercentiles, 2)
+	assert.Equal(t, 1, repo.replaced.ChartPercentiles[0].TargetID)
+	require.Len(t, repo.replaced.WorldsendChartPercentiles, 1)
+	assert.Equal(t, 7, repo.replaced.WorldsendChartPercentiles[0].TargetID)
 }
 
 func TestChartStatsBatchUsecase_Execute_エラー(t *testing.T) {
@@ -175,4 +179,7 @@ func TestChartStatsBatchUsecase_Execute_コース統計を同じスナップシ�
 	assert.Equal(t, float64(2_900_000), *repo.replaced.CourseStats[0].AverageScore)
 	assert.Equal(t, 11, repo.replaced.CourseStats[1].CourseID)
 	assert.Nil(t, repo.replaced.CourseStats[1].AverageScore)
+	require.Len(t, repo.replaced.CoursePercentiles, 2)
+	assert.Equal(t, 10, repo.replaced.CoursePercentiles[0].TargetID)
+	assert.Equal(t, 11, repo.replaced.CoursePercentiles[1].TargetID)
 }

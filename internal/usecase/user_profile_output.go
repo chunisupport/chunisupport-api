@@ -30,7 +30,10 @@ type UserProfileOutput struct {
 	Username string
 	Player   *UserPlayerOutput
 }
-type UserUpdatedAtOutput struct{ UpdatedAt *time.Time }
+type UserUpdatedAtOutput struct {
+	UpdatedAt     *time.Time
+	StatsRevision uint64
+}
 type UserProfileWithRecordsOutput struct {
 	UserID    int
 	Username  string
@@ -78,12 +81,14 @@ type PlayerRecordOutput struct {
 	Difficulty                            string
 	Const                                 chartconstant.ChartConstant
 	ClearLamp, ComboLamp, FullChain, Slot *string
+	TopPercent                            *float64
 }
 type WorldsendRecordOutput struct {
 	*entity.PlayerWorldsendRecord
-	UpdatedAt *time.Time
-	IsPlayed  bool
-	ID        string
+	UpdatedAt  *time.Time
+	IsPlayed   bool
+	ID         string
+	TopPercent *float64
 }
 
 func toPlayerRecordOutput(record *entity.PlayerRecord) *PlayerRecordOutput {

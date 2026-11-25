@@ -9,6 +9,13 @@ const (
 	// ChartStatsBatchInsertChunkSize は統計テーブルへの一括挿入で1文に含める行数です。
 	// 譜面統計は1行23列あるため、BulkInsertChunkSize では MySQL のプレースホルダー上限（65,535）を超えます。
 	ChartStatsBatchInsertChunkSize = 1000
+	// ScorePercentileInsertChunkSize は上位%境界テーブル（BLOB列を含む）への一括挿入で1文に含める行数です。
+	// 1行あたり最大約60KBのBLOBを含むため、MySQL の max_allowed_packet を超えないサイズに抑えます。
+	ScorePercentileInsertChunkSize = 100
+	// ScorePercentileRevisionPollInterval は別プロセス（CLIのchart-stats-batch）による統計更新を検知する間隔です。
+	ScorePercentileRevisionPollInterval = 10 * time.Second
+	// ScorePercentileRefreshTimeout は上位%スナップショット1回の再構築にかける時間の上限です。
+	ScorePercentileRefreshTimeout = 30 * time.Second
 	// ChartStatsBatchJobHistoryLimit は保持し、管理画面へ返す実行履歴の最大件数です。
 	// 新しいジョブを記録した時点で、これを超えた古いジョブを削除します。
 	ChartStatsBatchJobHistoryLimit = 50

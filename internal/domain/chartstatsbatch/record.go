@@ -2,7 +2,10 @@
 // プレイヤーの記録をベスト枠平均レーティング帯ごとに集計し、公開APIが参照する統計テーブルの内容を組み立てます。
 package chartstatsbatch
 
-import "github.com/chunisupport/chunisupport-api/internal/domain/entity"
+import (
+	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/scorepercentile"
+)
 
 // ChartRecord は集計対象プレイヤーの譜面別記録です。
 // 通常譜面とWORLD'S END譜面で共通に使い、ChartID にはそれぞれの譜面IDを入れます。
@@ -39,7 +42,10 @@ type BestSlotRecord struct {
 type Snapshot struct {
 	ChartStats []*entity.ChartStatsByRatingBand
 	// WorldsendChartStats の ChartID は WORLD'S END 譜面IDです。
-	WorldsendChartStats []*entity.ChartStatsByRatingBand
-	BestSlotStats       []*entity.ChartBestSlotStatsByRatingBand
-	CourseStats         []*entity.CourseStatsByRatingBand
+	WorldsendChartStats       []*entity.ChartStatsByRatingBand
+	BestSlotStats             []*entity.ChartBestSlotStatsByRatingBand
+	CourseStats               []*entity.CourseStatsByRatingBand
+	ChartPercentiles          []scorepercentile.Entry
+	WorldsendChartPercentiles []scorepercentile.Entry
+	CoursePercentiles         []scorepercentile.Entry
 }

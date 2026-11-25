@@ -185,6 +185,7 @@ func routeRolePolicies() map[string]string {
 		"GET /v1/courses/:id/stats":                                          "",
 		"POST /v1/courses":                                                   "apiAdminWrite",
 		"PUT /v1/courses/:id":                                                "apiEditorWrite",
+		"PUT /v1/courses/:id/tracks":                                         "apiEditorWrite",
 		"GET /v1/master/versions":                                            "",
 		"GET /compat/chunirec/2.0/music/showall":                             "",
 		"GET /compat/chunirec/2.0/music/show":                                "",

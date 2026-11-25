@@ -154,5 +154,7 @@ TEST_MYSQL_DSN='root:<password>@tcp(127.0.0.1:3306)/' go test -run '^$' -bench S
 | `worldsend_chart_stats_by_rating_band` | WORLD'S END譜面×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
 | `chart_best_slot_stats_by_rating_band` | 通常譜面×レーティング帯別のベスト枠採用統計。定期バッチで更新されます。 |
 | `course_stats_by_rating_band` | コース×レーティング帯別の統計データ。定期バッチで更新され、リクエスト時に参照されます。 |
+| `chart_score_percentiles` / `worldsend_chart_score_percentiles` / `course_score_percentiles` | 通常譜面・WORLD'S END譜面・コースの上位%境界データ（`ALL`帯）。APIプロセス内で不変スナップショットとしてメモリキャッシュし、`chart_stats_revision` の変化検知で自動再構築します。 |
+| `chart_stats_revision` | 譜面統計バッチの変更世代（単一行）。`chart-stats-batch` が統計入れ替えと同一トランザクションで更新します。 |
 
-`rating_bands`は起動時にプリロードし、統計4表はリクエスト時に参照します。
+`rating_bands`は起動時にプリロードし、レーティング帯別統計4表はリクエスト時に参照します。上位%境界3表は `SongCatalogProvider` と同じ世代監視方式（`ScorePercentileProvider`）でAPIプロセス内にメモリキャッシュします。

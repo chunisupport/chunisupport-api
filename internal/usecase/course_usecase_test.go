@@ -115,7 +115,7 @@ func (s *courseRepositoryStub) FindLatestUpdatedAt(context.Context, repository.E
 
 func TestCourseUsecase_Create_DisplayIDを生成して返す(t *testing.T) {
 	repo := &courseRepositoryStub{}
-	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil)
+	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil, nil)
 
 	output, err := uc.Create(context.Background(), CreateCourseInput{Idx: "50020", Name: "通常コース", Class: "1"})
 
@@ -129,7 +129,7 @@ func TestCourseUsecase_Get_DisplayIDで検索する(t *testing.T) {
 	displayID, err := displayid.NewDisplayID("0123456789abcdef")
 	require.NoError(t, err)
 	repo := &courseRepositoryStub{displayIDCourse: &entity.Course{DisplayID: displayID, OfficialIdx: "50020", Name: "通常コース", CourseClassID: 1}}
-	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil)
+	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil, nil)
 
 	output, err := uc.Get(context.Background(), displayID.String(), false)
 
@@ -142,7 +142,7 @@ func TestCourseUsecase_Update_DisplayIDで検索して保存する(t *testing.T)
 	displayID, err := displayid.NewDisplayID("0123456789abcdef")
 	require.NoError(t, err)
 	repo := &courseRepositoryStub{displayIDCourse: &entity.Course{DisplayID: displayID, OfficialIdx: "50020", Name: "変更前", CourseClassID: 1}}
-	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil)
+	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil, nil)
 
 	output, err := uc.Update(context.Background(), displayID.String(), UpdateCourseInput{Name: "変更後", Class: "1"})
 
@@ -169,7 +169,7 @@ func TestCourseUsecase_DeleteとRestore_DisplayIDで検索して削除状態を�
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &courseRepositoryStub{displayIDCourse: &entity.Course{DisplayID: displayID, OfficialIdx: "50020", Name: "コース", CourseClassID: 1, IsDeleted: !tt.expected}}
-			uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil)
+			uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil, nil)
 
 			err := tt.operation(uc)
 
@@ -192,7 +192,7 @@ func TestCourseUsecase_GetUserRecord_DisplayIDで対象レコードを選ぶ(t *
 		{Course: &entity.Course{DisplayID: displayID, OfficialIdx: "50020", Name: "対象コース", CourseClassID: 1}},
 	}}
 	userRepo := &courseUserRepositoryStub{user: &entity.User{PlayerID: &playerID}}
-	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, userRepo, nil)
+	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, userRepo, nil, nil)
 
 	output, err := uc.GetUserRecord(context.Background(), "player", nil, displayID.String())
 
@@ -285,7 +285,7 @@ func TestCourseUsecase_GetUserRecords_metaUpdatedAtがマスタとレコード�
 				latestUpdatedAt: tt.masterUpdatedAt,
 			}
 			userRepo := &courseUserRepositoryStub{user: &entity.User{PlayerID: tt.playerID}}
-			uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, userRepo, nil)
+			uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, userRepo, nil, nil)
 
 			// When
 			result, err := uc.GetUserRecords(context.Background(), "player", nil)
@@ -318,7 +318,7 @@ func TestCourseUsecase_GetCoursesUpdatedAt_リポジトリの値を返す(t *tes
 	// Given
 	expected := time.Date(2026, 7, 14, 12, 34, 56, 0, time.UTC)
 	repo := &courseRepositoryStub{latestUpdatedAt: &expected}
-	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil)
+	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil, nil)
 
 	// When
 	result, err := uc.GetCoursesUpdatedAt(context.Background())
@@ -332,7 +332,7 @@ func TestCourseUsecase_GetCoursesUpdatedAt_リポジトリの値を返す(t *tes
 func TestCourseUsecase_GetCoursesUpdatedAt_コースが無い場合はnil(t *testing.T) {
 	// Given
 	repo := &courseRepositoryStub{}
-	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil)
+	uc := NewCourseUsecase(nil, &passthroughTransactionManager{}, repo, nil, nil, nil)
 
 	// When
 	result, err := uc.GetCoursesUpdatedAt(context.Background())

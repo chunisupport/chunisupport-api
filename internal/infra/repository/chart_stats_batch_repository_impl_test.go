@@ -130,6 +130,23 @@ func setupChartStatsBatchRepositorySQLite(t *testing.T) *sqlx.DB {
 			),
 			PRIMARY KEY (chart_id, rating_band_id)
 		);
+		CREATE TABLE chart_stats_revision (
+			id INTEGER NOT NULL PRIMARY KEY,
+			revision INTEGER NOT NULL
+		);
+		INSERT INTO chart_stats_revision (id, revision) VALUES (1, 0);
+		CREATE TABLE chart_score_percentiles (
+			chart_id INTEGER NOT NULL PRIMARY KEY,
+			thresholds BLOB NOT NULL
+		);
+		CREATE TABLE worldsend_chart_score_percentiles (
+			worldsend_chart_id INTEGER NOT NULL PRIMARY KEY,
+			thresholds BLOB NOT NULL
+		);
+		CREATE TABLE course_score_percentiles (
+			course_id INTEGER NOT NULL PRIMARY KEY,
+			thresholds BLOB NOT NULL
+		);
 	`)
 	require.NoError(t, err)
 	return db

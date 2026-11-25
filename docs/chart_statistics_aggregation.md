@@ -123,15 +123,27 @@
 | `combo_lamp_id == 2` | `combo.fc` |
 | `combo_lamp_id == 3` | `combo.aj` |
 
+## 上位%（スコア分布境界）
+
+通常譜面・WORLD'S END譜面・コースのそれぞれについて、全体（`ALL`）帯における上位%（小数点以下2桁、`0.01`〜`100.00`）を逆引きするための境界データを集計する。
+
+- **母集団**: 他の統計と同じプレイヤー・削除除外条件を満たす全プレイ記録（通常譜面・WORLD'S ENDの `FAILED`、コースの未クリア `is_clear = 0` を含む）を対象とし、クリア状況によらず純粋なスコア順で集計する。
+- **算出式**: 対象スコア $x$ より厳密に高いスコアの記録数を $H(x)$、母集団の総記録数を $N$ としたとき、競技順位ベースの割合 `(H(x) + 1) / N × 100` を小数第3位で四捨五入し、最小値 `0.01`、最大値 `100.00` の範囲にクランプする。
+- **格納形式**: 同じ `0.01%` 値となる連続スコア区間を1つに統合した境界列（先頭1バイトのバージョン + スコア昇順の `min_score (uint32)`・`top_percent_bp (uint16)` ペア列）をバイナリで保存する。
+
 ## 読み取りと保存
 
-譜面統計・WORLD'S END 譜面統計・ベスト枠採用率・コース統計の集計元は、単一の REPEATABLE READ スナップショット内で読み取る。
+譜面統計・WORLD'S END 譜面統計・ベスト枠採用率・コース統計・上位%境界の集計元は、単一の REPEATABLE READ スナップショット内で読み取る。
 
-集計結果は次のテーブルへ保存する。4つのテーブルは単一トランザクション内で削除・挿入して入れ替えるため、再集計中や失敗時も直前の統計が参照される。
+集計結果は次のテーブルへ保存する。全統計テーブルの削除・挿入と `chart_stats_revision.revision` の更新は単一トランザクション内で行うため、再集計中や失敗時も直前の統計が参照される。
 
 - `chart_stats_by_rating_band`
 - `worldsend_chart_stats_by_rating_band`
 - `chart_best_slot_stats_by_rating_band`
 - `course_stats_by_rating_band`
+- `chart_score_percentiles`
+- `worldsend_chart_score_percentiles`
+- `course_score_percentiles`
+- `chart_stats_revision`
 
-APIレスポンスのフィールド構造はDBカラムに対応する。`average_score` と `median_score` が `NULL` になり得る一方、`player_count` と各分布のカウントは整数で返す。
+APIレスポンスのフィールド構造はDBカラムに対応する。`average_score` と `median_score` が `NULL` になり得る一方、`player_count` と各分布のカウントは整数で返す。上位%（`top_percent`）は内部API（`/internal`）のレコードレスポンスのみに付与し、未プレイまたは統計未集計時は `null` を返す。

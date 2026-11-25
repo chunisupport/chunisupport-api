@@ -6,6 +6,17 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
+type ReplaceCourseTracksRequest struct {
+	Tracks []CourseTrackRequest `json:"tracks"`
+}
+
+type CourseTrackRequest struct {
+	Number        int                   `json:"track_no"`
+	SelectionType string                `json:"selection_type"`
+	Filter        *CourseTrackFilterDTO `json:"filter"`
+	Charts        []CourseChartRefDTO   `json:"charts"`
+}
+
 type CourseTrackDTO struct {
 	Number        int                       `json:"track_no"`
 	SelectionType string                    `json:"selection_type"`

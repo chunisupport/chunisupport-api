@@ -31,18 +31,21 @@ type ChartStatsBatchRunner interface {
 type ChartStatsBatchJobUsecase struct {
 	*batchJobLifecycle[*entity.ChartStatsBatchJob, ChartStatsBatchResult]
 
-	runner ChartStatsBatchRunner
+	runner           ChartStatsBatchRunner
+	scorePercentiles repository.ScorePercentileProvider
 }
 
 // NewChartStatsBatchJobUsecase は ChartStatsBatchJobUsecase を生成します。
 // backgroundCtx は管理画面から起動したジョブの寿命で、サーバー停止時にキャンセルされるものを渡します。
+// scorePercentiles は統計更新後に再構築するプロセス内キャッシュで、キャッシュを持たない CLI では nil を渡します。
 func NewChartStatsBatchJobUsecase(
 	backgroundCtx context.Context,
 	lockProvider repository.BatchLockProvider,
 	jobRepo repository.ChartStatsBatchJobRepository,
 	runner ChartStatsBatchRunner,
+	scorePercentiles repository.ScorePercentileProvider,
 ) *ChartStatsBatchJobUsecase {
-	u := &ChartStatsBatchJobUsecase{runner: runner}
+	u := &ChartStatsBatchJobUsecase{runner: runner, scorePercentiles: scorePercentiles}
 	u.batchJobLifecycle = newBatchJobLifecycle(backgroundCtx, lockProvider, jobRepo, batchJobSpec[*entity.ChartStatsBatchJob, ChartStatsBatchResult]{
 		label:             "譜面統計バッチ",
 		lockName:          info.ChartStatsBatchLockName,
@@ -109,8 +112,19 @@ func (u *ChartStatsBatchJobUsecase) StartFromAdmin(ctx context.Context, requeste
 	)
 }
 
-// execute は譜面統計バッチを実行します。
+// execute は譜面統計バッチを実行し、成功した場合はプロセス内の上位%キャッシュを更新します。
 func (u *ChartStatsBatchJobUsecase) execute(ctx context.Context, _ *entity.ChartStatsBatchJob, logger *slog.Logger) (ChartStatsBatchResult, error) {
 	logger.Info("譜面統計バッチを開始します")
-	return u.runner.Execute(ctx)
+	result, err := u.runner.Execute(ctx)
+	// 管理画面がジョブの完了を検知した時点で上位%が反映済みになるよう、完了の記録より先にキャッシュを更新する。
+	// 再構築に失敗してもDB更新は成功しているため、ジョブは成功として記録し、失敗はログと定期確認での再試行に任せる。
+	if err == nil && u.scorePercentiles != nil {
+		refreshCtx, cancel := context.WithTimeout(ctx, info.ScorePercentileRefreshTimeout)
+		refreshErr := u.scorePercentiles.Refresh(refreshCtx)
+		cancel()
+		if refreshErr != nil && !errors.Is(refreshErr, context.Canceled) {
+			logger.ErrorContext(ctx, "failed to refresh score percentiles after chart stats batch", "error", refreshErr)
+		}
+	}
+	return result, err
 }

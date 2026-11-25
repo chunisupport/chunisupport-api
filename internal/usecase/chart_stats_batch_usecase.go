@@ -32,7 +32,7 @@ func NewChartStatsBatchUsecase(repo repository.ChartStatsBatchRepository) *Chart
 	return &ChartStatsBatchUsecase{repo: repo}
 }
 
-// Execute は譜面統計・WORLD'S END譜面統計・ベスト枠採用率・コース統計を集計し、統計テーブルを丸ごと入れ替えます。
+// Execute は譜面統計・WORLD'S END譜面統計・ベスト枠採用率・コース統計および上位%境界データを集計し、統計テーブルを丸ごと入れ替えます。
 // すべてを集計し終えてから単一トランザクションで入れ替えるため、実行中や失敗時にも公開APIからは直前の統計が見え続けます。
 func (u *ChartStatsBatchUsecase) Execute(ctx context.Context) (ChartStatsBatchResult, error) {
 	ratingBands, err := u.repo.FindRatingBands(ctx)
@@ -44,15 +44,20 @@ func (u *ChartStatsBatchUsecase) Execute(ctx context.Context) (ChartStatsBatchRe
 	worldsendChartStats := chartstatsbatch.NewChartStatsCalculator(ratingBands)
 	bestSlotStats := chartstatsbatch.NewBestSlotStatsCalculator(ratingBands)
 	courseStats := chartstatsbatch.NewCourseStatsCalculator(ratingBands)
+	chartPercentiles := chartstatsbatch.NewScorePercentileCalculator()
+	worldsendChartPercentiles := chartstatsbatch.NewScorePercentileCalculator()
+	coursePercentiles := chartstatsbatch.NewScorePercentileCalculator()
 	var result ChartStatsBatchResult
 	var bestSlotChartIDs []int
 	err = u.repo.StreamSource(ctx, repository.ChartStatsBatchSourceCallbacks{
 		ChartRecord: func(record chartstatsbatch.ChartRecord) error {
 			chartStats.Add(record)
+			chartPercentiles.Add(record.ChartID, record.Score)
 			return nil
 		},
 		WorldsendChartRecord: func(record chartstatsbatch.ChartRecord) error {
 			worldsendChartStats.Add(record)
+			worldsendChartPercentiles.Add(record.ChartID, record.Score)
 			return nil
 		},
 		EligiblePlayer: func(player chartstatsbatch.EligiblePlayer) error {
@@ -71,6 +76,7 @@ func (u *ChartStatsBatchUsecase) Execute(ctx context.Context) (ChartStatsBatchRe
 		},
 		CourseRecord: func(record chartstatsbatch.CourseRecord) error {
 			courseStats.Add(record)
+			coursePercentiles.Add(record.CourseID, record.Score)
 			return nil
 		},
 	})
@@ -79,10 +85,13 @@ func (u *ChartStatsBatchUsecase) Execute(ctx context.Context) (ChartStatsBatchRe
 	}
 
 	snapshot := &chartstatsbatch.Snapshot{
-		ChartStats:          chartStats.Results(),
-		WorldsendChartStats: worldsendChartStats.Results(),
-		BestSlotStats:       bestSlotStats.Results(bestSlotChartIDs),
-		CourseStats:         courseStats.Results(),
+		ChartStats:                chartStats.Results(),
+		WorldsendChartStats:       worldsendChartStats.Results(),
+		BestSlotStats:             bestSlotStats.Results(bestSlotChartIDs),
+		CourseStats:               courseStats.Results(),
+		ChartPercentiles:          chartPercentiles.Results(),
+		WorldsendChartPercentiles: worldsendChartPercentiles.Results(),
+		CoursePercentiles:         coursePercentiles.Results(),
 	}
 	result.ChartRecordCount = chartStats.RecordCount()
 	result.ChartStatsCount = len(snapshot.ChartStats)
