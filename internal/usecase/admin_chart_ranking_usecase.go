@@ -30,7 +30,7 @@ func NewAdminChartRankingUsecase(rankingRepo repository.AdminChartRankingQuerySe
 }
 
 func (u *adminChartRankingUsecase) GetStandard(ctx context.Context, displayID string, difficulty string) (*AdminChartRankingResult, error) {
-	data, err := u.rankingRepo.GetStandard(ctx, displayID, difficulty, info.AdminChartRankingLimit)
+	data, err := u.rankingRepo.GetStandard(ctx, displayID, difficulty, info.AdminRankingLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func (u *adminChartRankingUsecase) GetStandard(ctx context.Context, displayID st
 }
 
 func (u *adminChartRankingUsecase) GetWorldsend(ctx context.Context, displayID string) (*AdminChartRankingResult, error) {
-	data, err := u.rankingRepo.GetWorldsend(ctx, displayID, info.AdminChartRankingLimit)
+	data, err := u.rankingRepo.GetWorldsend(ctx, displayID, info.AdminRankingLimit)
 	if err != nil {
 		return nil, err
 	}

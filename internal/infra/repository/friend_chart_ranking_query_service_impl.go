@@ -35,6 +35,19 @@ type friendChartRankingChartRow struct {
 	IsWorldsend     bool                         `db:"is_worldsend"`
 }
 
+const friendRankingUsersSQL = `
+		SELECT ? AS user_id
+		UNION
+		SELECT f.friend_user_id
+		FROM friendships f
+		INNER JOIN friendships rf
+			ON rf.user_id = f.friend_user_id
+		   AND rf.friend_user_id = f.user_id
+		   AND rf.status_id = ?
+		WHERE f.user_id = ?
+		  AND f.status_id = ?
+`
+
 type friendChartRankingRecordRow struct {
 	UserID     int         `db:"user_id"`
 	Username   string      `db:"username"`
@@ -143,18 +156,7 @@ func (q *FriendChartRankingQueryService) ListRecords(ctx context.Context, exec d
 			co.name AS combo_lamp,
 			fc.name AS full_chain,
 			pr.updated_at AS updated_at
-		FROM (
-			SELECT ? AS user_id
-			UNION
-			SELECT f.friend_user_id
-			FROM friendships f
-			INNER JOIN friendships rf
-				ON rf.user_id = f.friend_user_id
-			   AND rf.friend_user_id = f.user_id
-			   AND rf.status_id = ?
-			WHERE f.user_id = ?
-			  AND f.status_id = ?
-		) ranking_users
+		FROM (` + friendRankingUsersSQL + `) ranking_users
 		INNER JOIN users u ON u.id = ranking_users.user_id
 		INNER JOIN players p ON p.id = u.player_id
 		INNER JOIN player_records pr ON pr.player_id = p.id AND pr.chart_id = ?
@@ -194,18 +196,7 @@ func (q *FriendChartRankingQueryService) ListWorldsendRecords(ctx context.Contex
 			co.name AS combo_lamp,
 			fc.name AS full_chain,
 			pwr.updated_at AS updated_at
-		FROM (
-			SELECT ? AS user_id
-			UNION
-			SELECT f.friend_user_id
-			FROM friendships f
-			INNER JOIN friendships rf
-				ON rf.user_id = f.friend_user_id
-			   AND rf.friend_user_id = f.user_id
-			   AND rf.status_id = ?
-			WHERE f.user_id = ?
-			  AND f.status_id = ?
-		) ranking_users
+		FROM (` + friendRankingUsersSQL + `) ranking_users
 		INNER JOIN users u ON u.id = ranking_users.user_id
 		INNER JOIN players p ON p.id = u.player_id
 		INNER JOIN player_worldsend_records pwr ON pwr.player_id = p.id AND pwr.worldsend_chart_id = ?

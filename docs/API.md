@@ -261,6 +261,7 @@ Content-Type: application/json
 | `/internal/admin/versions/:id` | PUT / DELETE | Firebase Bearer (ADMIN+) | バージョン改名・削除 |
 | `/internal/admin/chart-rankings/songs/:id/charts/:difficulty` | GET | Firebase Bearer (ADMIN+) | 通常譜面の全ユーザーランキング上位100件取得 |
 | `/internal/admin/chart-rankings/worldsend-songs/:id` | GET | Firebase Bearer (ADMIN+) | WORLD'S END譜面の全ユーザーランキング上位100件取得 |
+| `/internal/admin/course-rankings/:id` | GET | Firebase Bearer (ADMIN+) | コースの全ユーザーランキング上位100件取得 |
 | `/internal/admin/maintenance` | PUT | Firebase Bearer (ADMIN+) | メンテナンス状態を開始・終了 |
 | `/internal/admin/song-batch/jobs` | GET / POST | Firebase Bearer (ADMIN+) | 楽曲バッチの実行履歴取得・実行 |
 | `/internal/admin/song-batch/jobs/:id` | GET | Firebase Bearer (ADMIN+) | 楽曲バッチジョブの状態取得 |
@@ -292,6 +293,7 @@ Content-Type: application/json
 | `/internal/friends/requests/:username` | DELETE | Firebase Bearer | 自分が送ったフレンド申請取り消し |
 | `/internal/friend-rankings/songs/:id/charts/:difficulty` | GET | Firebase Bearer | 通常譜面のフレンドランキング取得 |
 | `/internal/friend-rankings/worldsend-songs/:id` | GET | Firebase Bearer | WORLD'S END譜面のフレンドランキング取得 |
+| `/internal/friend-rankings/courses/:id` | GET | Firebase Bearer | コースのフレンドランキング取得 |
 | `/internal/friend-comparisons/:username/charts/:difficulty` | GET | Firebase Bearer | 承認済みフレンドとの指定難易度スコア比較 |
 | `/internal/friend-comparisons/:username/worldsend` | GET | Firebase Bearer | 承認済みフレンドとのWORLD'S ENDスコア比較 |
 | `/internal/player-data/temp` | POST | なし | 未ログインでプレイヤーデータを一時受付（gzip JSON） |
@@ -706,6 +708,13 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
   - 403 Forbidden (`forbidden`): ADMIN以外によるアクセス
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・通常楽曲
   - 422 Unprocessable Entity (`validation_failed`): `id` の形式不正
+
+### GET `/internal/admin/course-rankings/:id`
+
+- **認証**: Firebase Bearer (ADMIN+)。
+- **概要**: 有効なコースのユーザーごとの自己ベストをスコア降順で最大100件返します。同点は同順位とし、更新日時の降順、次にユーザー名の昇順で並べます。
+- **レスポンス**: `course`（`id`, `name`, `class`）、`ranking`（`rank`, `username`, `player_name`, `score`, `is_clear`, `combo_lamp`, `updated_at`）、`total`（上位100件に制限する前の登録者数）。記録がなければ `ranking: []` と `total: 0` を返します。
+- **エラー**: 未認証は401、管理者権限がない場合は403、IDの形式不正は422、存在しないコースや削除済みコースは404です。
 
 ### GET `/internal/admin/build-info`
 - **認証**: Firebase Bearer (ADMIN)
@@ -1625,6 +1634,13 @@ WORLD'S END はレーティング・OVER POWER計算の対象外のため、通�
   - 401 Unauthorized (`missing_token` / `invalid_token`): 認証が必要
   - 404 Not Found (`chart_not_found`): 対象譜面が存在しない、または削除済み・通常楽曲
   - 500 Internal Server Error (`internal_error`): サーバー内部エラー
+
+### GET `/internal/friend-rankings/courses/:id`
+
+- **認証**: Firebase Bearer。
+- **概要**: 有効なコースについて、自分と相互承認済みのフレンドの自己ベストを返します。順位と並び順はコース全体ランキングと同じです。
+- **レスポンス**: 管理者向けコースランキングと同じフィールドに加え、`ranking` の各要素に本人かどうかを表す `is_self` を含みます。`total` は対象者のうち記録がある人数です。
+- **エラー**: IDの形式不正は422、未認証は401、存在しないコースや削除済みコースは404です。
 
 ## `/internal/friend-comparisons` グループ
 

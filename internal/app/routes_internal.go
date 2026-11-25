@@ -168,6 +168,7 @@ func registerInternalFriendRoutes(internal *echo.Group, handlers *Handlers, mw i
 	friendRankingGroup.Use(mw.firebaseAuthReadOptimized, mw.authenticatedReadRateLimit, mw.heavyReadConcurrencyLimit)
 	friendRankingGroup.GET("/songs/:id/charts/:difficulty", handlers.FriendChartRanking.GetStandard)
 	friendRankingGroup.GET("/worldsend-songs/:id", handlers.FriendChartRanking.GetWorldsend)
+	friendRankingGroup.GET("/courses/:id", handlers.CourseRanking.GetFriends)
 
 	friendComparisonGroup := internal.Group("/friend-comparisons")
 	friendComparisonGroup.Use(mw.firebaseAuthReadOptimized, mw.authenticatedReadRateLimit, mw.heavyReadConcurrencyLimit)
@@ -230,6 +231,7 @@ func registerInternalAdminRoutes(internal *echo.Group, handlers *Handlers, mw in
 	adminGroup.GET("/user-stats", handlers.AdminUserStatistics.Get)
 	adminGroup.GET("/chart-rankings/songs/:id/charts/:difficulty", handlers.AdminChartRanking.GetStandard)
 	adminGroup.GET("/chart-rankings/worldsend-songs/:id", handlers.AdminChartRanking.GetWorldsend)
+	adminGroup.GET("/course-rankings/:id", handlers.CourseRanking.GetAdmin)
 	adminGroup.PUT("/maintenance", handlers.SystemMaintenance.Update)
 	adminGroup.GET("/versions", handlers.Version.List)
 	adminGroup.POST("/versions", handlers.Version.Create)
