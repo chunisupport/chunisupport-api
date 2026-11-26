@@ -48,9 +48,9 @@ SELECT
     ppl.played_at
 FROM player_play_logs ppl
 LEFT JOIN charts c ON c.id = ppl.chart_id
-LEFT JOIN songs standard_song ON standard_song.id = c.song_id
+LEFT JOIN songs standard_song ON standard_song.id = c.song_id AND standard_song.is_deleted = 0
 LEFT JOIN worldsend_charts wc ON wc.id = ppl.worldsend_chart_id
-LEFT JOIN songs worldsend_song ON worldsend_song.id = wc.song_id
+LEFT JOIN songs worldsend_song ON worldsend_song.id = wc.song_id AND worldsend_song.is_deleted = 0
 LEFT JOIN difficulties d ON d.id = ppl.difficulty_id
 INNER JOIN clear_lamp_types cl ON cl.id = ppl.clear_lamp_id
 INNER JOIN combo_lamp_types co ON co.id = ppl.combo_lamp_id
@@ -97,7 +97,7 @@ func (r *playerDataRepository) FindPlayLogChartCandidates(ctx context.Context, e
 		WITH filtered_songs AS (
 			SELECT id, title, jacket
 			FROM songs
-			WHERE jacket IN (?)
+			WHERE jacket IN (?) AND is_deleted = 0
 		)
 		SELECT c.id, s.title, s.jacket, c.difficulty_id
 		FROM filtered_songs s

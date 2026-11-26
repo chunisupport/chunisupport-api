@@ -25,15 +25,17 @@ func TestFindPlayLogChartCandidates_ジャケットで通常譜面とWORLD_END�
 		INSERT INTO songs (id, display_id, title, artist, genre_id, official_idx, jacket, is_worldsend, is_deleted)
 		VALUES
 			(1, 'normal-song', '通常曲', 'artist', 1, 'normal-idx', 'shared-jacket', 0, 0),
-			(2, 'worldsend-song', 'WORLD''S END曲', 'artist', 1, 'worldsend-idx', 'shared-jacket', 1, 0)
+			(2, 'worldsend-song', 'WORLD''S END曲', 'artist', 1, 'worldsend-idx', 'shared-jacket', 1, 0),
+            (3, 'deleted-song', '削除済み曲', 'artist', 1, 'deleted-idx', 'shared-jacket', 0, 1),
+            (4, 'deleted-worldsend', '削除済みWE曲', 'artist', 1, 'deleted-we-idx', 'shared-jacket', 1, 1)
 	`)
 	require.NoError(t, err)
 	_, err = db.Exec(`
 		INSERT INTO charts (id, song_id, difficulty_id, const, is_const_unknown)
-		VALUES (101, 1, 4, 14.0, 0)
+		VALUES (101, 1, 4, 14.0, 0), (102, 3, 4, 14.0, 0)
 	`)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO worldsend_charts (id, song_id) VALUES (201, 2)`)
+	_, err = db.Exec(`INSERT INTO worldsend_charts (id, song_id) VALUES (201, 2), (202, 4)`)
 	require.NoError(t, err)
 	repo := NewPlayerDataRepository(db)
 
@@ -189,4 +191,17 @@ func TestFindPlayHistory_譜面とランプを解決して受信順で返す(t *
 	assert.Nil(t, entries[1].FullChain)
 	assert.Nil(t, entries[2].Title)
 	assert.Equal(t, "EXPERT", *entries[2].Difficulty)
+
+	// When
+	_, err = db.Exec(`UPDATE songs SET is_deleted = 1 WHERE id IN (100, 200)`)
+	require.NoError(t, err)
+	entries, err = NewPlayerPlayHistoryQueryService(db).FindByPlayerID(context.Background(), db, 7)
+
+	// Then
+	require.NoError(t, err)
+	require.Len(t, entries, 3)
+	assert.Nil(t, entries[0].Title)
+	assert.Nil(t, entries[1].Title)
+	assert.Equal(t, firstPlayedAt, entries[0].PlayedAt)
+	assert.Equal(t, secondPlayedAt, entries[1].PlayedAt)
 }
