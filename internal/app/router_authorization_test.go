@@ -207,7 +207,7 @@ func TestRegisterRoutes_ユーザー集計はADMINだけが取得できる(t *te
 	}
 }
 
-func TestRegisterRoutes_譜面ランキングはADMINだけが取得できる(t *testing.T) {
+func TestRegisterRoutes_全体ランキングはADMINだけが取得できる(t *testing.T) {
 	roles := []struct {
 		name       string
 		token      string
@@ -216,6 +216,7 @@ func TestRegisterRoutes_譜面ランキングはADMINだけが取得できる(t 
 		{name: "ADMINは取得できる", token: "admin-token", wantStatus: http.StatusOK},
 		{name: "EDITORは拒否される", token: "editor-token", wantStatus: http.StatusForbidden},
 		{name: "PLAYERは拒否される", token: "player-token", wantStatus: http.StatusForbidden},
+		{name: "未認証は拒否される", wantStatus: http.StatusUnauthorized},
 	}
 	paths := []struct {
 		name string
@@ -223,6 +224,7 @@ func TestRegisterRoutes_譜面ランキングはADMINだけが取得できる(t 
 	}{
 		{name: "通常譜面", path: "/internal/admin/chart-rankings/songs/0000000000000001/charts/MASTER"},
 		{name: "WORLD'S END", path: "/internal/admin/chart-rankings/worldsend-songs/0000000000000002"},
+		{name: "コース", path: "/internal/admin/course-rankings/0000000000000001"},
 	}
 
 	for _, path := range paths {
@@ -235,7 +237,9 @@ func TestRegisterRoutes_譜面ランキングはADMINだけが取得できる(t 
 				e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
 				registerRoutes(e, handlers, stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, stubMaintenanceUsecase{}, config.Config{})
 				req := httptest.NewRequestWithContext(context.Background(), http.MethodGet, path.path, nil)
-				req.Header.Set(echo.HeaderAuthorization, "Bearer "+role.token)
+				if role.token != "" {
+					req.Header.Set(echo.HeaderAuthorization, "Bearer "+role.token)
+				}
 				rec := httptest.NewRecorder()
 
 				// When
@@ -246,6 +250,82 @@ func TestRegisterRoutes_譜面ランキングはADMINだけが取得できる(t 
 			})
 		}
 	}
+}
+
+func TestRegisterRoutes_コースランキングの本人フラグはフレンド用だけに含まれる(t *testing.T) {
+	tests := []struct {
+		name       string
+		path       string
+		token      string
+		wantIsSelf [2]string
+	}{
+		{
+			name:       "フレンド用は本人とフレンドの両方に含む",
+			path:       "/internal/friend-rankings/courses/0000000000000001",
+			token:      "player-token",
+			wantIsSelf: [2]string{"true", "false"},
+		},
+		{
+			name:  "管理者用は全員の行で省略する",
+			path:  "/internal/admin/course-rankings/0000000000000001",
+			token: "admin-token",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			handlers := newAuthorizationTestHandlers()
+			handlers.CourseRanking = internalhandler.NewCourseRankingHandler(stubCourseRankingUsecase{
+				result: usecase.CourseRankingResult{
+					CourseID: "0000000000000001",
+					Ranking: []usecase.CourseRankingEntry{
+						{Rank: 1, Username: "me", Score: 3_020_000, IsSelf: true},
+						{Rank: 2, Username: "friend", Score: 3_010_000},
+					},
+					Total: 2,
+				},
+			})
+			e := echo.New()
+			e.HTTPErrorHandler = appmiddleware.CustomHTTPErrorHandler
+			registerRoutes(e, handlers, stubFirebaseAuthenticator{}, stubFirebaseAuthenticator{}, nil, stubMaintenanceUsecase{}, config.Config{})
+			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, tt.path, nil)
+			req.Header.Set(echo.HeaderAuthorization, "Bearer "+tt.token)
+			rec := httptest.NewRecorder()
+
+			// When
+			e.ServeHTTP(rec, req)
+
+			// Then
+			require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+			var response struct {
+				Ranking []struct {
+					Username string          `json:"username"`
+					IsSelf   json.RawMessage `json:"is_self"`
+				} `json:"ranking"`
+			}
+			require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+			require.Len(t, response.Ranking, 2)
+			assert.Equal(t, "me", response.Ranking[0].Username)
+			assert.Equal(t, "friend", response.Ranking[1].Username)
+			assert.Equal(t, tt.wantIsSelf, [2]string{
+				string(response.Ranking[0].IsSelf),
+				string(response.Ranking[1].IsSelf),
+			})
+		})
+	}
+}
+
+type stubCourseRankingUsecase struct {
+	result usecase.CourseRankingResult
+}
+
+func (s stubCourseRankingUsecase) GetAdmin(context.Context, string) (*usecase.CourseRankingResult, error) {
+	return &s.result, nil
+}
+
+func (s stubCourseRankingUsecase) GetFriends(context.Context, int, string) (*usecase.CourseRankingResult, error) {
+	return &s.result, nil
 }
 
 type stubAdminChartRankingUsecase struct{}
@@ -614,6 +694,7 @@ func TestRegisterRoutes_認証必須の読み取りGETはread最適化認証を�
 		{name: "送信したフレンド申請の取得", method: http.MethodGet, path: "/internal/friends/requests/sent", wantReadOptimizedCalls: 1},
 		{name: "フレンドランキングの取得", method: http.MethodGet, path: "/internal/friend-rankings/songs/abc/charts/MASTER", wantReadOptimizedCalls: 1},
 		{name: "WORLD'S ENDフレンドランキングの取得", method: http.MethodGet, path: "/internal/friend-rankings/worldsend-songs/abc", wantReadOptimizedCalls: 1},
+		{name: "コースフレンドランキングの取得", method: http.MethodGet, path: "/internal/friend-rankings/courses/abc", wantReadOptimizedCalls: 1},
 		{name: "公開設定の更新", method: http.MethodPut, path: "/internal/me/privacy", wantStrictCalls: 1},
 		{name: "アカウント削除", method: http.MethodDelete, path: "/internal/me", wantStrictCalls: 1},
 		{name: "ログイン用Firebaseアカウントの変更", method: http.MethodPut, path: "/internal/me/firebase-account", wantStrictCalls: 1},
@@ -998,6 +1079,7 @@ func newAuthorizationTestHandlers() *Handlers {
 		UserPermission:      new(internalhandler.UserPermissionHandler),
 		AdminUserStatistics: new(internalhandler.AdminUserStatisticsHandler),
 		AdminChartRanking:   new(internalhandler.AdminChartRankingHandler),
+		CourseRanking:       internalhandler.NewCourseRankingHandler(stubCourseRankingUsecase{}),
 		Song:                new(internalhandler.SongHandler),
 		BestSlotStats:       new(internalhandler.BestSlotStatsHandler),
 		Honor:               new(internalhandler.HonorHandler),

@@ -37,6 +37,7 @@ type Handlers struct {
 	UserSuspicious        *api_internal.UserSuspiciousHandler
 	AdminUserStatistics   *api_internal.AdminUserStatisticsHandler
 	AdminChartRanking     *api_internal.AdminChartRankingHandler
+	CourseRanking         *api_internal.CourseRankingHandler
 	Song                  *api_internal.SongHandler
 	Honor                 *api_internal.HonorHandler
 	Version               *api_internal.VersionHandler
@@ -189,6 +190,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 	friendChartRankingUsecase := usecase.NewFriendChartRankingUsecase(db, friendChartRankingQueryService)
 	friendScoreComparisonUsecase := usecase.NewFriendScoreComparisonUsecase(friendScoreComparisonQueryService)
 	adminChartRankingUsecase := usecase.NewAdminChartRankingUsecase(adminChartRankingQueryService)
+	courseRankingUsecase := usecase.NewCourseRankingUsecase(db, courseRepo, infra.CourseRankingQueryService{})
 	bestSlotRankingUsecase := usecase.NewBestSlotRankingUsecase(bestSlotRankingQueryService, chartStatsMasterProvider)
 	masterDataUsecase := usecase.NewMasterDataUsecase(masterCache, chartStatsMasterProvider)
 	dataTransferCodec, err := datatransfer.NewCodec(cfg.DataTransferHMACSecret)
@@ -239,6 +241,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 		UserSuspicious:        api_internal.NewUserSuspiciousHandler(userSuspiciousUsecase),
 		AdminUserStatistics:   api_internal.NewAdminUserStatisticsHandler(adminUserStatisticsUsecase),
 		AdminChartRanking:     api_internal.NewAdminChartRankingHandler(adminChartRankingUsecase),
+		CourseRanking:         api_internal.NewCourseRankingHandler(courseRankingUsecase),
 		Song:                  api_internal.NewSongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),
 		Honor:                 api_internal.NewHonorHandler(honorUsecase),
 		Version:               api_internal.NewVersionHandler(versionUsecase),
