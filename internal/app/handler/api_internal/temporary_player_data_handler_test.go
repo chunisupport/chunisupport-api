@@ -503,6 +503,19 @@ func TestTemporaryPlayerData_一時保存した本文をcommit時に登録でき
 	assert.Equal(t, hex.EncodeToString(hash[:]), captured.hash)
 }
 
+func TestDecodeTemporaryPlayerDataPayload_プレイ履歴を確定保存に渡す(t *testing.T) {
+	body := gzipJSON(t, json.RawMessage(`{"score_history":[{"title":"曲","diff":"worldsend","score":0,"clear_lamp":null,"cmb_lv":1,"fch_lv":1,"is_new":false,"played_at":"2026/11/26 00:10"}]}`))
+
+	payload, err := DecodeTemporaryPlayerDataPayload(body)
+
+	require.NoError(t, err)
+	require.NotNil(t, payload)
+	assert.Equal(t, []usecase.PlayerDataPlayLogEntry{{
+		Title: "曲", Diff: "worldsend", Score: new(0), ComboLv: new(1), FullChain: new(1),
+		IsNew: new(false), PlayedAt: "2026/11/26 00:10",
+	}}, payload.ScoreHistory)
+}
+
 func TestDecodeTemporaryPlayerDataPayload_不正な保存本文はエラー(t *testing.T) {
 	tests := []struct {
 		name   string

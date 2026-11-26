@@ -103,6 +103,7 @@ func routeRolePolicies() map[string]string {
 		"GET /internal/users/:username/record/courses/:id/history":           "",
 		"GET /internal/users/:username/record/worldsend-songs/:id/history":   "",
 		"GET /internal/users/:username/record":                               "",
+		"GET /internal/users/:username/record/play-history":                  "firebaseEditor",
 		"GET /internal/users/:username/locked-songs":                         "",
 		"GET /internal/users/:username/favorite-songs":                       "",
 		"GET /internal/users/:username":                                      "",

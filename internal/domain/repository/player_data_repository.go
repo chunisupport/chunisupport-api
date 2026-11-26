@@ -46,6 +46,11 @@ type OverpowerTargetStats struct {
 
 // PlayerDataRepository はプレイヤーデータ登録に関する永続化を扱うリポジトリです。
 type PlayerDataRepository interface {
+	FindPlayLogChartCandidates(ctx context.Context, exec Executor, jackets []string) ([]entity.PlayLogChartCandidate, error)
+
+	// ReplacePlayLogs はスコアと同じトランザクションで一覧を受信順に置き換えます。
+	ReplacePlayLogs(ctx context.Context, exec Executor, playerID int, logs []entity.PlayerPlayLog) error
+
 	// LoadMasterData はプレイヤーデータ登録に必要なマスタ情報を取得します。
 	// 登録処理では別の接続を待たないよう、登録と同じExecutorを渡してください。
 	LoadMasterData(ctx context.Context, exec Executor, officialIdxList []string) (*PlayerDataMaster, error)
@@ -81,4 +86,10 @@ type PlayerDataRepository interface {
 
 	// FindLatestUpdateByPlayerIDForUpdate は最新データ登録結果をトランザクション内でロックして取得します。
 	FindLatestUpdateByPlayerIDForUpdate(ctx context.Context, exec Executor, playerID int) (*entity.PlayerLatestUpdate, error)
+}
+
+// PlayerPlayHistoryQueryService は保存済みプレイ履歴の読み取りを扱います。
+type PlayerPlayHistoryQueryService interface {
+	// FindByPlayerID はプレイ履歴を受信順（新しい順）で取得します。
+	FindByPlayerID(ctx context.Context, exec Executor, playerID int) ([]entity.PlayerPlayHistory, error)
 }

@@ -1075,6 +1075,7 @@ func newAuthorizationTestHandlers() *Handlers {
 		Signup:              new(internalhandler.SignupHandler),
 		Profile:             new(internalhandler.ProfileHandler),
 		User:                new(internalhandler.UserHandler),
+		PlayerPlayHistory:   new(internalhandler.PlayerPlayHistoryHandler),
 		AdminUser:           new(internalhandler.AdminUserHandler),
 		UserPermission:      new(internalhandler.UserPermissionHandler),
 		AdminUserStatistics: new(internalhandler.AdminUserStatisticsHandler),

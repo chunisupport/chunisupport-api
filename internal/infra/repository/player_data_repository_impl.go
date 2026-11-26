@@ -20,9 +20,122 @@ type playerDataRepository struct {
 	db *sqlx.DB
 }
 
+var _ repository.PlayerPlayHistoryQueryService = (*playerDataRepository)(nil)
+
+type playerPlayHistoryRow struct {
+	Title      *string   `db:"title"`
+	Difficulty *string   `db:"difficulty"`
+	Score      int       `db:"score"`
+	ClearLamp  *string   `db:"clear_lamp"`
+	ComboLamp  *string   `db:"combo_lamp"`
+	FullChain  *string   `db:"full_chain"`
+	PlayedAt   time.Time `db:"played_at"`
+}
+
+// FindByPlayerID は譜面に紐付いたタイトルとランプ名を一括で解決してプレイ履歴を返します。
+func (r *playerDataRepository) FindByPlayerID(ctx context.Context, exec repository.Executor, playerID int) ([]entity.PlayerPlayHistory, error) {
+	const query = `
+SELECT
+    CASE
+        WHEN ppl.chart_id IS NOT NULL THEN standard_song.title
+        WHEN ppl.worldsend_chart_id IS NOT NULL THEN worldsend_song.title
+    END AS title,
+    CASE WHEN ppl.difficulty_id IS NULL THEN 'WORLDSEND' ELSE d.name END AS difficulty,
+    ppl.score,
+    NULLIF(cl.name, 'NONE') AS clear_lamp,
+    NULLIF(co.name, 'NONE') AS combo_lamp,
+    NULLIF(fc.name, 'NONE') AS full_chain,
+    ppl.played_at
+FROM player_play_logs ppl
+LEFT JOIN charts c ON c.id = ppl.chart_id
+LEFT JOIN songs standard_song ON standard_song.id = c.song_id AND standard_song.is_deleted = 0
+LEFT JOIN worldsend_charts wc ON wc.id = ppl.worldsend_chart_id
+LEFT JOIN songs worldsend_song ON worldsend_song.id = wc.song_id AND worldsend_song.is_deleted = 0
+LEFT JOIN difficulties d ON d.id = ppl.difficulty_id
+INNER JOIN clear_lamp_types cl ON cl.id = ppl.clear_lamp_id
+INNER JOIN combo_lamp_types co ON co.id = ppl.combo_lamp_id
+INNER JOIN full_chain_types fc ON fc.id = ppl.full_chain_id
+WHERE ppl.player_id = ?
+ORDER BY ppl.play_order
+`
+	var rows []playerPlayHistoryRow
+	if err := exec.SelectContext(ctx, &rows, query, playerID); err != nil {
+		return nil, fmt.Errorf("%w: find player play history: %w", repository.ErrRepositoryOperationFailed, err)
+	}
+	history := make([]entity.PlayerPlayHistory, 0, len(rows))
+	for _, row := range rows {
+		history = append(history, entity.PlayerPlayHistory{
+			Title: row.Title, Difficulty: row.Difficulty, Score: row.Score,
+			ClearLamp: row.ClearLamp, ComboLamp: row.ComboLamp, FullChain: row.FullChain,
+			PlayedAt: row.PlayedAt,
+		})
+	}
+	return history, nil
+}
+
 // NewPlayerDataRepository は PlayerDataRepository の実装を生成します。
 func NewPlayerDataRepository(db *sqlx.DB) repository.PlayerDataRepository {
 	return &playerDataRepository{db: db}
+}
+
+// NewPlayerPlayHistoryQueryService は保存済みプレイ履歴の読み取りサービスを生成します。
+func NewPlayerPlayHistoryQueryService(db *sqlx.DB) repository.PlayerPlayHistoryQueryService {
+	return &playerDataRepository{db: db}
+}
+
+// FindPlayLogChartCandidates はジャケット名を一括照合し、通常譜面とWORLD'S END譜面の候補を返します。
+// プレイ履歴は最大50件に制限されるため、照合は1回のIN句で実行します。
+func (r *playerDataRepository) FindPlayLogChartCandidates(ctx context.Context, exec repository.Executor, jackets []string) ([]entity.PlayLogChartCandidate, error) {
+	if exec == nil {
+		return nil, fmt.Errorf("FindPlayLogChartCandidates requires a non-nil executor")
+	}
+	if len(jackets) == 0 {
+		return nil, nil
+	}
+
+	query, args, err := sqlx.In(`
+		WITH filtered_songs AS (
+			SELECT id, title, jacket
+			FROM songs
+			WHERE jacket IN (?) AND is_deleted = 0
+		)
+		SELECT c.id, s.title, s.jacket, c.difficulty_id
+		FROM filtered_songs s
+		INNER JOIN charts c ON c.song_id = s.id
+		UNION ALL
+		SELECT wc.id, s.title, s.jacket, 0
+		FROM filtered_songs s
+		INNER JOIN worldsend_charts wc ON wc.song_id = s.id
+	`, jackets)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build play log chart candidate query: %w", err)
+	}
+
+	var rows []models.PlayLogChartCandidateModel
+	if err := exec.SelectContext(ctx, &rows, exec.Rebind(query), args...); err != nil {
+		return nil, fmt.Errorf("failed to find play log chart candidates: %w", err)
+	}
+	candidates := make([]entity.PlayLogChartCandidate, 0, len(rows))
+	for _, row := range rows {
+		candidates = append(candidates, row.ToEntity())
+	}
+	return candidates, nil
+}
+
+// ReplacePlayLogs はプレイヤーのプレイ履歴を受信順で置き換えます。
+// 削除と登録に同じExecutorを使うことで、スコア登録トランザクションから履歴だけが残る状態を防ぎます。
+func (r *playerDataRepository) ReplacePlayLogs(ctx context.Context, exec repository.Executor, playerID int, logs []entity.PlayerPlayLog) error {
+	if exec == nil {
+		return fmt.Errorf("ReplacePlayLogs requires a non-nil executor")
+	}
+	if _, err := exec.ExecContext(ctx, `DELETE FROM player_play_logs WHERE player_id = ?`, playerID); err != nil {
+		return fmt.Errorf("failed to delete player play logs: %w", err)
+	}
+	rows := make([]models.PlayerPlayLogModel, len(logs))
+	for i, log := range logs {
+		rows[i] = models.FromPlayerPlayLogEntity(playerID, i, log)
+	}
+	return bulkExec(ctx, exec, rows, playerPlayLogInsertQuery, "player play logs")
 }
 
 // LoadMasterData はプレイヤーデータ登録に必要なマスタ情報を取得します。
@@ -488,6 +601,16 @@ const fullRecordInsertQuery = `
 const worldsendRecordInsertQuery = `
  INSERT INTO player_worldsend_records (player_id, worldsend_chart_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, updated_at)
  VALUES (:player_id, :worldsend_chart_id, :score, :clear_lamp_id, :combo_lamp_id, :full_chain_id, :updated_at)
+`
+
+const playerPlayLogInsertQuery = `
+ INSERT INTO player_play_logs (
+  player_id, play_order, chart_id, worldsend_chart_id, jacket_img_id,
+  difficulty_id, score, clear_lamp_id, combo_lamp_id, full_chain_id, played_at
+ ) VALUES (
+  :player_id, :play_order, :chart_id, :worldsend_chart_id, :jacket_img_id,
+  :difficulty_id, :score, :clear_lamp_id, :combo_lamp_id, :full_chain_id, :played_at
+ )
 `
 
 func (r *playerDataRepository) saveFullRecords(ctx context.Context, exec repository.Executor, records []repository.PlayerRecordForUpsert) error {

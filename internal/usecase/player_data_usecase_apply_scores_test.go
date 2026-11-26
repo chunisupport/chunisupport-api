@@ -497,7 +497,7 @@ func TestValidatePlayerDataIdentity_同一取得日時の本文だけを許可�
 			uc := &playerDataUsecase{playerDataRepo: repo}
 
 			// When
-			err := uc.validatePlayerDataIdentity(context.Background(), nil, 10, updatedAt, tt.bodyHash)
+			_, err := uc.validatePlayerDataIdentity(context.Background(), nil, 10, updatedAt, tt.bodyHash)
 
 			// Then
 			if tt.wantConflict {
@@ -819,6 +819,14 @@ func (s *stubPlayerDataRepositoryForApplyScoresTest) FindWorldsendRecordStatesBy
 		}
 	}
 	return states, nil
+}
+
+func (s *stubPlayerDataRepositoryForApplyScoresTest) FindPlayLogChartCandidates(context.Context, repository.Executor, []string) ([]entity.PlayLogChartCandidate, error) {
+	return nil, nil
+}
+
+func (s *stubPlayerDataRepositoryForApplyScoresTest) ReplacePlayLogs(context.Context, repository.Executor, int, []entity.PlayerPlayLog) error {
+	return nil
 }
 
 func (s *stubPlayerDataRepositoryForApplyScoresTest) LoadMasterData(_ context.Context, _ repository.Executor, _ []string) (*repository.PlayerDataMaster, error) {

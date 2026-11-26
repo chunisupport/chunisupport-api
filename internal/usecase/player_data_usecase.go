@@ -11,18 +11,19 @@ import (
 
 // PlayerDataPayload はCHUNITHMプレイヤーデータインポートの入力構造です。
 type PlayerDataPayload struct {
-	AppVersion  string
-	Name        string
-	Level       int
-	Rating      *float64
-	LastPlayed  string
-	Overpower   PlayerDataOverpowerPayload
-	ClassEmblem PlayerDataClassPayload
-	Possession  string
-	Team        PlayerDataTeamPayload
-	Honors      map[string]PlayerDataHonorPayload
-	Scores      PlayerDataScorePayload
-	UpdatedAt   string
+	AppVersion   string
+	Name         string
+	Level        int
+	Rating       *float64
+	LastPlayed   string
+	Overpower    PlayerDataOverpowerPayload
+	ClassEmblem  PlayerDataClassPayload
+	Possession   string
+	Team         PlayerDataTeamPayload
+	Honors       map[string]PlayerDataHonorPayload
+	Scores       PlayerDataScorePayload
+	ScoreHistory []PlayerDataPlayLogEntry
+	UpdatedAt    string
 }
 
 // PlayerDataOverpowerPayload はオーバーパワー情報です。
@@ -65,6 +66,18 @@ type PlayerDataCourseEntry struct {
 	IsClear bool
 	ComboLv int
 	Idx     string
+}
+
+type PlayerDataPlayLogEntry struct {
+	Title     string
+	Diff      string
+	Jacket    *string
+	Score     *int
+	ClearLamp *string
+	ComboLv   *int
+	FullChain *int
+	IsNew     *bool
+	PlayedAt  string
 }
 
 // PlayerDataScoreEntry は1件のスコア情報です。

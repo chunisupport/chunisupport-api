@@ -40,6 +40,9 @@ const (
 	APITokenRandomByteLength                    = 32
 	APITokenPrefixLength                        = 5
 	APITokenLastUsedUpdateInterval              = time.Hour
+	MaxPlayerPlayLogs                           = 50
+	MaxPlayLogTitleLength                       = 300
+	MaxPlayLogJacketLength                      = 20
 	MaxScoreHistoryEntriesPerChart              = constants.MaxScoreHistoryEntriesPerChart
 	MaxMetricHistoryEntriesPerPlayer            = constants.MaxMetricHistoryEntriesPerPlayer
 	MaxOfficialRating                           = constants.MaxOfficialRating

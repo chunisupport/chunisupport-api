@@ -217,6 +217,7 @@ func registerInternalUserRoutes(internal *echo.Group, handlers *Handlers, mw int
 
 	usersGroup := internal.Group("/users")
 	usersGroup.Use(mw.firebaseAuthStrict)
+	usersGroup.GET("/:username/record/play-history", handlers.PlayerPlayHistory.Get, mw.requireEditor)
 	usersGroup.GET("/", handlers.AdminUser.GetAllUsers, mw.requireAdmin)
 	usersGroup.DELETE("/:username", handlers.User.DeleteUser, mw.requireAdmin)
 	usersGroup.PATCH("/:username/permission", handlers.UserPermission.UpdatePermission, mw.requireAdmin)

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
-	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/masterfingerprint"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/playername/playernametest"
@@ -33,12 +32,6 @@ type passthroughTransactionManagerForPlayerDataIdentity struct {
 func (m *passthroughTransactionManagerForPlayerDataIdentity) Transactional(_ context.Context, fn func(repository.Executor) error) error {
 	m.err = fn(m.exec)
 	return m.err
-}
-
-type stubPlayerDataMasterProviderForIdentity struct{}
-
-func (stubPlayerDataMasterProviderForIdentity) PlayerDataMasters() *masterdata.PlayerDataMasters {
-	return &masterdata.PlayerDataMasters{}
 }
 
 func (s *stubPlayerRepositoryForPlayerData) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Player, error) {
@@ -176,14 +169,14 @@ func TestRegister_同一取得日時の異なる本文は後続保存前に競�
 	userRepo.On("FindByIDForUpdate", mock.Anything, txExecutor, 1).Return(user, nil).Once()
 	uc := &playerDataUsecase{
 		tm: tm, userRepo: userRepo, playerRepo: playerRepo,
-		playerDataRepo: playerDataRepo, masterCache: stubPlayerDataMasterProviderForIdentity{},
+		playerDataRepo: playerDataRepo, masterCache: registrationMasterProvider{newApplyScoresTestMasters().PlayerDataMasters},
 	}
 	rating := 17.25
 	overpower := 12345.67
 	payload := &PlayerDataPayload{
 		AppVersion: "0.1.0", Name: "登録済み", Level: 50, Rating: &rating,
 		Overpower: PlayerDataOverpowerPayload{Value: &overpower, Percentage: &officialOverpowerPercent},
-		UpdatedAt: updatedAt.Format(time.RFC3339),
+		UpdatedAt: updatedAt.Format(time.RFC3339), ScoreHistory: []PlayerDataPlayLogEntry{validPlayLogEntry()},
 	}
 
 	// When

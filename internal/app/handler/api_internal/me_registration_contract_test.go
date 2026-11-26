@@ -30,7 +30,7 @@ func (s *registrationContractUsecase) Register(ctx context.Context, user *entity
 
 func TestMeHandler_RegisterData_本文とハッシュを渡し受信と解凍後の上限を区別する(t *testing.T) {
 	const limit = 5_242_880
-	const original = `{"app_ver":"1.2.3","name":"テスト","level":42,"scores":{"standard":[{"idx":"123","diff":"MASTER","score":1009000,"cmb_lv":3}],"worldsend":[{"idx":"456","score":990000}],"course":[{"idx":"789","score":3000000,"is_clear":true,"cmb_lv":2}]}}`
+	const original = `{"app_ver":"1.2.3","name":"テスト","level":42,"scores":{"standard":[{"idx":"123","diff":"MASTER","score":1009000,"cmb_lv":3}],"worldsend":[{"idx":"456","score":990000}],"course":[{"idx":"789","score":3000000,"is_clear":true,"cmb_lv":2}]},"score_history":[{"title":"曲","diff":"master","jacket_img_id":"abc123","score":0,"is_new":false,"played_at":"2026/11/26 00:10","clear_lamp":"failed","cmb_lv":1,"fch_lv":1}]}`
 	for _, tt := range []struct {
 		name, format          string
 		decodedSize, wireSize int
@@ -65,6 +65,10 @@ func TestMeHandler_RegisterData_本文とハッシュを渡し受信と解凍後
 				assert.Same(t, user, gotUser)
 				assert.Equal(t, &usecase.PlayerDataPayload{
 					AppVersion: "1.2.3", Name: "テスト", Level: 42, Honors: map[string]usecase.PlayerDataHonorPayload{},
+					ScoreHistory: []usecase.PlayerDataPlayLogEntry{{
+						Title: "曲", Diff: "master", Jacket: new("abc123"), Score: new(0), IsNew: new(false),
+						PlayedAt: "2026/11/26 00:10", ClearLamp: new("failed"), ComboLv: new(1), FullChain: new(1),
+					}},
 					Scores: usecase.PlayerDataScorePayload{
 						Standard:  []usecase.PlayerDataScoreEntry{{Idx: "123", Diff: "MASTER", Score: 1009000, ComboLv: new(3)}},
 						Worldsend: []usecase.PlayerDataScoreEntry{{Idx: "456", Score: 990000}},

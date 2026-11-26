@@ -401,6 +401,36 @@ CREATE TABLE `player_metric_histories` (
   PRIMARY KEY (`player_id`,`data_collected_at`),
   CONSTRAINT `fk_player_metric_histories_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `player_play_logs` (
+  `player_id` int unsigned NOT NULL,
+  `play_order` tinyint unsigned NOT NULL,
+  `chart_id` mediumint unsigned DEFAULT NULL,
+  `worldsend_chart_id` mediumint unsigned DEFAULT NULL,
+  `jacket_img_id` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `difficulty_id` tinyint unsigned DEFAULT NULL,
+  `score` mediumint unsigned NOT NULL,
+  `clear_lamp_id` tinyint unsigned NOT NULL,
+  `combo_lamp_id` tinyint unsigned NOT NULL,
+  `full_chain_id` tinyint unsigned NOT NULL,
+  `played_at` datetime NOT NULL,
+  PRIMARY KEY (`player_id`,`play_order`),
+  KEY `fk_player_play_logs_chart` (`chart_id`),
+  KEY `fk_player_play_logs_worldsend_chart` (`worldsend_chart_id`),
+  KEY `fk_player_play_logs_difficulty` (`difficulty_id`),
+  KEY `fk_player_play_logs_clear_lamp` (`clear_lamp_id`),
+  KEY `fk_player_play_logs_combo_lamp` (`combo_lamp_id`),
+  KEY `fk_player_play_logs_full_chain` (`full_chain_id`),
+  CONSTRAINT `fk_player_play_logs_chart` FOREIGN KEY (`chart_id`) REFERENCES `charts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_player_play_logs_clear_lamp` FOREIGN KEY (`clear_lamp_id`) REFERENCES `clear_lamp_types` (`id`),
+  CONSTRAINT `fk_player_play_logs_combo_lamp` FOREIGN KEY (`combo_lamp_id`) REFERENCES `combo_lamp_types` (`id`),
+  CONSTRAINT `fk_player_play_logs_difficulty` FOREIGN KEY (`difficulty_id`) REFERENCES `difficulties` (`id`),
+  CONSTRAINT `fk_player_play_logs_full_chain` FOREIGN KEY (`full_chain_id`) REFERENCES `full_chain_types` (`id`),
+  CONSTRAINT `fk_player_play_logs_player` FOREIGN KEY (`player_id`) REFERENCES `players` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_player_play_logs_worldsend_chart` FOREIGN KEY (`worldsend_chart_id`) REFERENCES `worldsend_charts` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `chk_player_play_logs_chart_type` CHECK ((((`chart_id` is null) or (`difficulty_id` is not null)) and ((`worldsend_chart_id` is null) or (`difficulty_id` is null)))),
+  CONSTRAINT `chk_player_play_logs_play_order` CHECK ((`play_order` between 0 and 49)),
+  CONSTRAINT `chk_player_play_logs_score` CHECK ((`score` between 0 and 1010000))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `player_record_histories` (
   `player_id` int unsigned NOT NULL,
   `chart_id` mediumint unsigned NOT NULL,

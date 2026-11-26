@@ -34,7 +34,7 @@ func newRegistrationFixture(t *testing.T) *registrationFixture {
 	data := &registrationDataRepository{t: t, tx: tx, player: player, stubPlayerDataRepositoryForApplyScoresTest: &stubPlayerDataRepositoryForApplyScoresTest{latestUpdateErr: repository.ErrPlayerLatestUpdateNotFound}, masters: &repository.PlayerDataMaster{Songs: masters.songs, ChartsByKey: masters.chartsByKey, ChartsByID: masters.chartsByID, WorldsendBySongID: masters.worldsendBySongID}}
 	records := &registrationRecordRepository{stubPlayerRecordRepositoryForApplyScoresTest: &stubPlayerRecordRepositoryForApplyScoresTest{}, t: t, tx: tx}
 	uc := &playerDataUsecase{tm: &trackingTM{passedFloor: tx}, userRepo: &registrationUserRepository{t: t, tx: tx, user: user}, playerRepo: player, playerRecRepo: records, worldsendRecRepo: &stubWorldsendRecordRepositoryForApplyScoresTest{}, playerDataRepo: data, masterCache: registrationMasterProvider{masters.PlayerDataMasters}}
-	return &registrationFixture{uc: uc, user: user, payload: &PlayerDataPayload{Name: "テスト", Level: 42, Rating: new(16.0), Overpower: PlayerDataOverpowerPayload{Value: new(100.0), Percentage: new(1.0)}, UpdatedAt: now.Format(time.RFC3339)}, data: data, player: player, records: records, tx: tx}
+	return &registrationFixture{uc: uc, user: user, payload: &PlayerDataPayload{Name: "テスト", Level: 42, Rating: new(16.0), Overpower: PlayerDataOverpowerPayload{Value: new(100.0), Percentage: new(1.0)}, UpdatedAt: now.Format(time.RFC3339), ScoreHistory: []PlayerDataPlayLogEntry{validPlayLogEntry()}}, data: data, player: player, records: records, tx: tx}
 }
 
 type registrationMasterProvider struct {
