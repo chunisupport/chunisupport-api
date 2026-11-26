@@ -9,7 +9,7 @@
 - `POST /internal/me/register-data`
 - `POST /internal/player-data/commit`
 
-`/internal/player-data/commit` は一時保存した本文を復元した後、`/internal/me/register-data` と同じ `PlayerDataUsecase.Register` を呼ぶ。そのため、両エンドポイントの差分仕様は同一である。登録処理はプレイヤー情報、称号、通常譜面、WORLD'S END、コース、レーティング再計算を含む1トランザクションで実行され、失敗時は差分を含めて登録全体が確定しない。
+`/internal/player-data/commit` は一時保存した本文を復元した後、`/internal/me/register-data` と同じ `PlayerDataUsecase.Register` を呼ぶ。そのため、両エンドポイントの差分仕様は同一である。登録処理はプレイヤー情報、称号、通常譜面、WORLD'S END、コース、直近のプレイ履歴、レーティング再計算を含む1トランザクションで実行され、失敗時は差分を含めて登録全体が確定しない。
 
 リクエスト形式、認証、バリデーション、エラー仕様を含むAPI全体の仕様は [API.md](./API.md) を参照する。
 

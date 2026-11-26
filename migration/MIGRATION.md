@@ -120,6 +120,17 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     - `clear_lamp_id`, `combo_lamp_id`, `full_chain_id`: クリア状況を示すマスタへの外部キー。
     - `updated_at`: 更新日時。
 
+#### `player_play_logs`
+- **役割**: CHUNITHM-NETのプレイ履歴一覧から受信した、プレイヤーごとの直近最大50プレイを一覧順で保持します。登録ごとに保存済み履歴を置き換えます。同一取得日時・同一本文の再送では保存済み履歴を維持します。
+- **主なカラム**:
+    - `player_id`, `play_order`: プレイヤーIDと一覧上の順番（0が最新）の複合主キー。
+    - `chart_id`, `worldsend_chart_id`: 譜面を特定できた場合の通常譜面またはWORLD'S END譜面ID。未特定のプレイは両方をNULLにした状態で、履歴行を保存します。
+    - `jacket_img_id`: 再照合に使うジャケット画像ID。
+    - `difficulty_id`: 通常譜面の難易度。`difficulties.id` への外部キーで、WORLD'S END は `NULL`。
+    - `score`, `clear_lamp_id`, `combo_lamp_id`, `full_chain_id`: プレイ時のスコアとランプ情報。
+    - `played_at`: 一覧表示上のJSTのプレイ日時をUTCへ正規化した日時。
+- **ユーザーデータ移行**: プレイ履歴はユーザーデータ移行の対象外です。
+
 #### `player_honors`
 - **役割**: プレイヤーに装着されている称号を管理します。
 - **主なカラム**:

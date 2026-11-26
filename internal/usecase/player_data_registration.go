@@ -94,6 +94,10 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		return nil, fmt.Errorf("invalid player data: %w", err)
 	}
 
+	if err := validatePlayLogCount(payload.ScoreHistory); err != nil {
+		return nil, err
+	}
+
 	teamObservation, err := newPlayerTeamObservation(payload.Team)
 	if err != nil {
 		return nil, err
@@ -135,6 +139,11 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			return loadErr
 		}
 
+		playLogs, validationErr := buildPlayLogs(payload.ScoreHistory, masters)
+		if validationErr != nil {
+			return validationErr
+		}
+
 		classID, baseID, classErr := resolveClassEmblemIDs(payload.ClassEmblem, masters)
 		if classErr != nil {
 			return classErr
@@ -148,7 +157,8 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 			return ensureErr
 		}
 		result.PlayerID = playerID
-		if identityErr := us.validatePlayerDataIdentity(ctx, tx, playerID, updatedAt, bodyHash); identityErr != nil {
+		replayed, identityErr := us.validatePlayerDataIdentity(ctx, tx, playerID, updatedAt, bodyHash)
+		if identityErr != nil {
 			return identityErr
 		}
 
@@ -177,6 +187,12 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		counts, scoreSkipped, changes, statistics, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt, beforeStatistics)
 		if scoreErr != nil {
 			return scoreErr
+		}
+		// 再送時はマスタの更新だけで保存済みの紐付けが変わらないようにします。
+		if !replayed {
+			if err := us.replacePlayLogs(ctx, tx, playerID, playLogs); err != nil {
+				return err
+			}
 		}
 		skippedRecords = append(skippedRecords, scoreSkipped...)
 		summaryInput.OverpowerValue = overpowerSummary.Value
@@ -275,31 +291,26 @@ func withPlayerDataRegistrationContext(userID, playerID int, err error) error {
 	return fmt.Errorf("player data registration failed (user_id=%d, player_id=%d): %w", userID, playerID, err)
 }
 
-func (us *playerDataUsecase) validatePlayerDataIdentity(ctx context.Context, tx repository.Executor, playerID int, updatedAt time.Time, bodyHash string) error {
+func (us *playerDataUsecase) validatePlayerDataIdentity(ctx context.Context, tx repository.Executor, playerID int, updatedAt time.Time, bodyHash string) (bool, error) {
 	latestUpdate, err := us.playerDataRepo.FindLatestUpdateByPlayerIDForUpdate(ctx, tx, playerID)
 	if err != nil {
 		if errors.Is(err, repository.ErrPlayerLatestUpdateNotFound) {
-			return nil
+			return false, nil
 		}
-		return fmt.Errorf("failed to validate player data identity: %w", err)
+		return false, fmt.Errorf("failed to validate player data identity: %w", err)
 	}
 	if err := latestUpdate.ValidateInputIdentity(updatedAt, bodyHash); err != nil {
-		return &PlayerDataConflictError{Reason: err.Error(), Err: err}
+		return false, &PlayerDataConflictError{Reason: err.Error(), Err: err}
 	}
-	return nil
+	return latestUpdate.SourceUpdatedAt().Equal(updatedAt), nil
 }
 
 // parsePlayerDataTimes はゲーム由来の時刻をUTCへ正規化します。
 // lastPlayed はCHUNITHM-NETが日本時間の壁時計として出力する仕様であり、API出力用timezoneとは独立しています。
 func parsePlayerDataTimes(lastPlayed, updatedAtRaw string) (*time.Time, time.Time, error) {
-	loc, err := time.LoadLocation("Asia/Tokyo")
-	if err != nil {
-		loc = time.FixedZone("Asia/Tokyo", 9*60*60)
-	}
-
 	var lastPlayedAt *time.Time
 	if strings.TrimSpace(lastPlayed) != "" {
-		parsed, err := time.ParseInLocation(tokyoLayout, lastPlayed, loc)
+		parsed, err := parsePlayerDataJST(lastPlayed)
 		if err != nil {
 			return nil, time.Time{}, &PlayerDataValidationError{
 				Field:   "last_played",
@@ -307,8 +318,7 @@ func parsePlayerDataTimes(lastPlayed, updatedAtRaw string) (*time.Time, time.Tim
 				Err:     err,
 			}
 		}
-		utc := parsed.UTC()
-		lastPlayedAt = &utc
+		lastPlayedAt = &parsed
 	}
 
 	updatedAt, err := time.Parse(time.RFC3339, updatedAtRaw)
@@ -321,6 +331,19 @@ func parsePlayerDataTimes(lastPlayed, updatedAtRaw string) (*time.Time, time.Tim
 	}
 
 	return lastPlayedAt, updatedAt.UTC(), nil
+}
+
+var playerDataJST = func() *time.Location {
+	loc, err := time.LoadLocation("Asia/Tokyo")
+	if err != nil {
+		return time.FixedZone("Asia/Tokyo", 9*60*60)
+	}
+	return loc
+}()
+
+func parsePlayerDataJST(value string) (time.Time, error) {
+	parsed, err := time.ParseInLocation(tokyoLayout, value, playerDataJST)
+	return parsed.UTC(), err
 }
 
 // ensurePlayer はロック済みのプレイヤーを更新します。未登録なら作成し、IDと更新前の状態を返します。

@@ -175,6 +175,7 @@ func (s *stubPlayerRecordRepositoryForLockedSong) GetLastScoreUpdate(ctx context
 }
 
 type stubPlayerDataRepositoryForLockedSong struct {
+	repository.PlayerDataRepository
 	receivedFilter repository.OverpowerTargetFilter
 	receivedExec   repository.Executor
 }

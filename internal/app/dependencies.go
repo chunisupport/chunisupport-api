@@ -59,6 +59,7 @@ type Handlers struct {
 	FriendScoreComparison *api_internal.FriendScoreComparisonHandler
 	BestSlotStats         *api_internal.BestSlotStatsHandler
 	InternalScoreHistory  *api_internal.ScoreHistoryHandler
+	PlayerPlayHistory     *api_internal.PlayerPlayHistoryHandler
 	InternalMetricHistory *api_internal.PlayerMetricHistoryHandler
 	Course                *api_internal.CourseHandler
 	CourseStats           *api_internal.CourseStatsHandler
@@ -120,6 +121,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 	playerFavoriteSongQueryService := infra.NewPlayerFavoriteSongQueryService()
 	playerFavoriteSongLocker := infra.NewPlayerFavoriteSongLocker()
 	friendshipRepo := infra.NewFriendshipRepository()
+	playerPlayHistoryUsecase := usecase.NewPlayerPlayHistoryUsecase(db, userRepo, friendshipRepo, infra.NewPlayerPlayHistoryQueryService(db))
 	friendChartRankingQueryService := infra.NewFriendChartRankingQueryService()
 	friendScoreComparisonQueryService := infra.NewFriendScoreComparisonQueryService(db)
 	adminChartRankingQueryService := infra.NewAdminChartRankingQueryService(db)
@@ -263,6 +265,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 		FriendScoreComparison: api_internal.NewFriendScoreComparisonHandler(friendScoreComparisonUsecase),
 		BestSlotStats:         api_internal.NewBestSlotStatsHandler(bestSlotRankingUsecase, chartStatsUsecase, chartStatsMasterProvider),
 		InternalScoreHistory:  api_internal.NewScoreHistoryHandler(scoreHistoryUsecase),
+		PlayerPlayHistory:     api_internal.NewPlayerPlayHistoryHandler(playerPlayHistoryUsecase),
 		InternalMetricHistory: api_internal.NewPlayerMetricHistoryHandler(playerMetricHistoryUsecase),
 		Course:                api_internal.NewCourseHandler(courseUsecase),
 		CourseStats:           api_internal.NewCourseStatsHandler(courseStatsUsecase, chartStatsMasterProvider),

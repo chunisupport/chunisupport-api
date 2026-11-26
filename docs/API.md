@@ -322,6 +322,7 @@ Content-Type: application/json
 | `/internal/users/:username/rating` | GET | Firebase Bearer (任意) | レーティング枠のみ取得 |
 | `/internal/users/:username/rating-op-history` | GET | Firebase Bearer (任意) | 公式RATING・公式OVER POWER・公式OP%履歴取得 |
 | `/internal/users/:username/record` | GET | Firebase Bearer (任意) | レコード枠のみ取得 |
+| `/internal/users/:username/record/play-history` | GET | Firebase Bearer (EDITOR+) | 管理画面向け直近プレイ履歴取得 |
 | `/internal/users/:username/record/songs/:id` | GET | Firebase Bearer (任意) | 通常楽曲1曲分のレコード取得 |
 | `/internal/users/:username/record/songs/:id/:difficulty/history` | GET | Firebase Bearer (任意) | 通常譜面スコア履歴取得 |
 | `/internal/users/:username/record/worldsend-songs/:id` | GET | Firebase Bearer (任意) | WORLD'S END楽曲1曲分のレコード取得 |
@@ -1912,7 +1913,7 @@ friend_played = both_played + friend_only_played
 - **制限**: リクエストボディ最大5MB（圧縮前のJSONデータに対して適用）。空ボディや余分なデータは 400。ファイルサイズ超過で 413。
 - **リクエストボディ**: 
   - **デフォルト形式（推奨）**: JSONデータをgzip圧縮後、base64エンコードした文字列
-  - **デバッグ形式（`?format=json`）**: `PlayerDataPayload` 構造に準拠した生JSON。公式アプリのエクスポートJSONをそのまま送信する想定。
+  - **デバッグ形式（`?format=json`）**: `PlayerDataPayload` 構造に準拠した生JSON。ブックマークレットが収集するプレイヤーデータと同じ形式です。
   - **未知のフィールドの扱い**: 構造体に定義されていないフィールドは無視されます。将来の互換性のため、クライアント側で追加情報を含めることができます。未知のフィールドが含まれていた場合、サーバーログに警告が記録されますが、エラーにはなりません。
 
 #### リクエスト形式
@@ -2084,6 +2085,19 @@ curl -X POST \
       }
     ]
   },
+  "score_history": [
+    {
+      "title": "曲名",
+      "diff": "MASTER",
+      "jacket_img_id": "f4364273b04ec545",
+      "score": 1002345,
+      "is_new": true,
+      "played_at": "2025/11/02 16:42",
+      "clear_lamp": "brave",
+      "cmb_lv": 2,
+      "fch_lv": 1
+    }
+  ],
   "updated_at": "2025-11-27T10:30:03+09:00"
 }
 ```
@@ -2110,9 +2124,30 @@ curl -X POST \
 | `scores.standard` | array | ✓ | 通常譜面スコア配列 |
 | `scores.worldsend` | array | ✓ | WORLD'S END スコア配列 |
 | `scores.course` | array | | コーススコア配列。省略時は空配列として扱う |
+| `score_history` | array | ✓ | 直近のプレイ履歴。新しい順で1〜50件 |
 | `updated_at` | string | ✓ | 更新日時 (ISO8601) |
 
 `rating`、`overpower.value`、`overpower.percentage`は常にセットかつ小数第2位までの値として必要です。いずれかの省略・`null`・小数第3位以下を含む値は`422 validation_failed`となり、既存の公式値を更新しません。`overpower.percentage`は0以上100以下です。既存の`data_collected_at`より古い`updated_at`、同一`updated_at`で異なる公式指標を送信した場合、または同一`updated_at`で保存済み本文と異なる本文を送信した場合は`409 conflict`となり、現在値と履歴の時系列を維持します。同一`updated_at`の再送は、本文のSHA-256ハッシュも一致する場合のみ冪等な入力として受け付けます。
+
+#### 直近のプレイ履歴
+
+| フィールド | 型 | 必須 | 説明 |
+| ---------- | -- | ---- | ---- |
+| `title` | string | ✓ | CHUNITHM-NETに表示される曲名。300文字まで。登録時の譜面照合に使用 |
+| `diff` | string | ✓ | `BASIC`、`ADVANCED`、`EXPERT`、`MASTER`、`ULTIMA`、`WORLD'S END`。通常譜面は登録済みスコアと同じ略記も可。WORLD'S END は `WE`、`WORLDSEND` も可。大文字小文字を区別しない |
+| `jacket_img_id` | string \| null | | 拡張子を除いたジャケット画像名。20文字まで |
+| `score` | integer | ✓ | 0〜1,010,000 |
+| `is_new` | boolean | ✓ | NEW RECORD が表示されたか。プレイ履歴への保存対象外 |
+| `played_at` | string | ✓ | 日本時間の `YYYY/MM/DD HH:mm`。保存時にUTCに変換 |
+| `clear_lamp` | string \| null | | 既存スコアと同じクリアランプ。`null` または省略は `FAILED` |
+| `cmb_lv` | integer | ✓ | 1: なし、2: FULL COMBO、3: ALL JUSTICE |
+| `fch_lv` | integer | ✓ | 1: なし、2: FULL CHAIN PLATINUM、3: FULL CHAIN GOLD |
+
+受信順で履歴全体を置き換えます。同一日時・同一本文の再送では保存済みの履歴を維持します。ジャケット画像IDと難易度で譜面を照合し、同じ画像を使う譜面が複数ある場合は曲名も確認します。譜面を一意に特定できない場合も、再照合用のジャケット画像IDと難易度を含むプレイ履歴を保存します。
+
+`score_history` の欠落、`null`、空配列、51件以上、または不正な項目を含む配列は `422 validation_failed` となります。履歴の保存に失敗したときはスコアを含めて登録全体をロールバックします。直近のプレイ履歴はユーザーデータ移行の対象外です。
+
+#### 所属チーム
 
 所属チームは`team`の内容に応じて次のように保存します。チーム名は変更できるため、チームの識別には`team.code`を使います。
 
@@ -3487,6 +3522,58 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   }
 }
 ```
+
+### GET `/internal/users/:username/record/play-history`
+
+- **認証**: Firebase Bearer 必須
+- **権限**: EDITOR または ADMIN
+- **概要**: 管理画面で確認する対象ユーザーの直近プレイ履歴を、登録時の新しい順で最大50件返します。通常楽曲またはWORLD'S END譜面に現行マスタで紐付く場合だけ `title` を返します。`difficulty` は保存時の難易度（WORLD'S END は `WORLDSEND`）を返し、解決できない古いデータでは `null` になります。非公開設定のユーザーは本人または承認済みフレンド以外 404 を返します。
+- **レスポンスヘッダー**: `Cache-Control: private, no-store`
+
+```json
+{
+  "entries": [
+    {
+      "title": "楽曲名",
+      "difficulty": "MASTER",
+      "score": 1005000,
+      "clear_lamp": "CLEAR",
+      "combo_lamp": "FULL COMBO",
+      "full_chain": null,
+      "played_at": "2026-11-26T12:34:56Z"
+    },
+    {
+      "title": null,
+      "difficulty": null,
+      "score": 990000,
+      "clear_lamp": null,
+      "combo_lamp": null,
+      "full_chain": null,
+      "played_at": "2026-11-26T12:30:00Z"
+    }
+  ]
+}
+```
+
+#### PlayerPlayHistoryResponse スキーマ
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `entries` | PlayerPlayHistoryEntry[] | 登録時の受信順（新しい順）のプレイ履歴 |
+| `entries[].title` | string \| null | 現行マスタと紐付いた楽曲タイトル。未解決の場合は `null` |
+| `entries[].difficulty` | `BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA` / `WORLDSEND` \| null | 譜面難易度。未解決の場合は `null` |
+| `entries[].score` | integer | プレイ時のスコア |
+| `entries[].clear_lamp` | string \| null | プレイ時のクリアランプ。NONE相当は `null` |
+| `entries[].combo_lamp` | string \| null | プレイ時のコンボランプ。NONE相当は `null` |
+| `entries[].full_chain` | string \| null | プレイ時のフルチェイン。NONE相当は `null` |
+| `entries[].played_at` | string | プレイ日時（ISO8601） |
+
+- **主なエラー**:
+  - 400 Bad Request (`username_empty` / `username_too_short` / `username_too_long` / `username_invalid_char`): `username` が不正
+  - 401 Unauthorized (`missing_token` / `invalid_token`): Firebase認証が必要
+  - 403 Forbidden (`forbidden`): EDITOR または ADMIN 権限が必要
+  - 404 Not Found (`user_not_found`): ユーザーが存在しない、または非公開設定で閲覧できない
+  - 500 Internal Server Error (`internal_error`): 取得失敗
 
 ### GET `/internal/users/:username/record/songs/:id`
 
