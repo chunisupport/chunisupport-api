@@ -7,6 +7,8 @@ const (
 	AccountTypeExtDev = 4
 )
 
+const FullChainRainbowName = "FULL CHAIN RAINBOW"
+
 // IsKnownAccountType は権限IDの大小に依存せず、許可された権限だけを受け入れます。
 func IsKnownAccountType(accountTypeID int) bool {
 	switch accountTypeID {

@@ -3,6 +3,7 @@ package service
 import (
 	"fmt"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 )
 
@@ -87,7 +88,8 @@ func addPlayerRecordStatistics(statistics *PlayerRecordStatistics, score int, cl
 	if clearLamp != "FAILED" {
 		achievements.CLR++
 	}
-	if fullChain == "FULL CHAIN GOLD" || fullChain == "FULL CHAIN PLATINUM" {
+	switch fullChain {
+	case "FULL CHAIN GOLD", "FULL CHAIN PLATINUM", constants.FullChainRainbowName:
 		achievements.FCH++
 	}
 	if score == playerRecordScoreMax {

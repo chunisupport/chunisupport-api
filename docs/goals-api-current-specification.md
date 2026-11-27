@@ -435,6 +435,8 @@ DB上の `goals` テーブルは以下の構造です。
 - `lamp` は以下のいずれか
   - `GOLD`（マスタ名 `FULL CHAIN GOLD`）
   - `PLATINUM`（マスタ名 `FULL CHAIN PLATINUM`）
+  - `RAINBOW`（マスタ名 `FULL CHAIN RAINBOW`）
+- 達成数は指定ランプ以上を数えます。GOLDは金・鉑・虹、PLATINUMは鉑・虹、RAINBOWは虹が対象です。
 - キーは `lamp` / `count` / `remaining` / `percent` のみ
 - `count` / `remaining` / `percent` がいずれも省略または `null` の場合は、対象譜面数そのものを目標件数として扱う想定です。
 

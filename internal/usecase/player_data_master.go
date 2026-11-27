@@ -7,9 +7,11 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/chunisupport/chunisupport-api/internal/domain/constants"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
 var (
@@ -283,6 +285,8 @@ func resolveFullChainID(fullChain *int, masters *playerDataMaster) (int, error) 
 		name = "full chain platinum"
 	case 3:
 		name = "full chain gold"
+	case info.PlayerDataFullChainRainbowLevel:
+		name = strings.ToLower(constants.FullChainRainbowName)
 	default:
 		return 0, &PlayerDataValidationError{Field: "fch_lv", Message: fmt.Sprintf("unknown full chain level: %d", value)}
 	}

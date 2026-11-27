@@ -315,6 +315,9 @@ func validateScoreAndLampNames(path string, value score.Score, clearLamp, comboL
 	if value == score.Score(constants.TheoreticalScore) && comboLamp != "ALL JUSTICE" {
 		return invalidUserDataTransfer(path + ".combo_lamp_name must be ALL JUSTICE at the theoretical score")
 	}
+	if fullChain == constants.FullChainRainbowName && comboLamp != "ALL JUSTICE" {
+		return invalidUserDataTransfer(path + ".full_chain_name requires ALL JUSTICE")
+	}
 	if fullChain != "NONE" && comboLamp != "FULL COMBO" && comboLamp != "ALL JUSTICE" {
 		return invalidUserDataTransfer(path + ".full_chain_name requires a combo lamp")
 	}

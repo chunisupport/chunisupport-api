@@ -2137,13 +2137,15 @@ curl -X POST \
 | `diff` | string | ✓ | `BASIC`、`ADVANCED`、`EXPERT`、`MASTER`、`ULTIMA`、`WORLD'S END`。通常譜面は登録済みスコアと同じ略記も可。WORLD'S END は `WE`、`WORLDSEND` も可。大文字小文字を区別しない |
 | `jacket_img_id` | string \| null | | 拡張子を除いたジャケット画像名。20文字まで |
 | `score` | integer | ✓ | 0〜1,010,000 |
-| `is_new` | boolean | ✓ | NEW RECORD が表示されたか。プレイ履歴への保存対象外 |
+| `is_new` | boolean | ✓ | NEW RECORD が表示されたか。プレイ履歴には保存しないが、新規または成績更新された通常譜面・WORLD'S END譜面の `updated_at` に一致する `played_at` を反映する判定に使用 |
 | `played_at` | string | ✓ | 日本時間の `YYYY/MM/DD HH:mm`。保存時にUTCに変換 |
 | `clear_lamp` | string \| null | | 既存スコアと同じクリアランプ。`null` または省略は `FAILED` |
 | `cmb_lv` | integer | ✓ | 1: なし、2: FULL COMBO、3: ALL JUSTICE |
-| `fch_lv` | integer | ✓ | 1: なし、2: FULL CHAIN PLATINUM、3: FULL CHAIN GOLD |
+| `fch_lv` | integer | ✓ | 1: なし、2: FULL CHAIN PLATINUM、3: FULL CHAIN GOLD、4: FULL CHAIN RAINBOW（`cmb_lv=3` が必須） |
 
 受信順で履歴全体を置き換えます。同一日時・同一本文の再送では保存済みの履歴を維持します。ジャケット画像IDと難易度で譜面を照合し、同じ画像を使う譜面が複数ある場合は曲名も確認します。譜面を一意に特定できない場合も、再照合用のジャケット画像IDと難易度を含むプレイ履歴を保存します。
+
+通常譜面または WORLD'S END 譜面が新規登録または成績更新される際、同じ譜面に一意に照合できた `is_new: true` かつスコア一致の履歴があり、その `played_at` が `TIMESTAMP` の有効範囲内かつリクエストの `updated_at` 以下（既存レコード更新時は前回 `updated_at` より新しい場合）であれば、その最新の `played_at` をレコードの `updated_at` に採用します。条件を満たさない場合は従来どおりリクエストの `updated_at` を使用します。成績変化のない既存レコードの `updated_at` は更新しません。
 
 `score_history` の欠落、`null`、空配列、51件以上、または不正な項目を含む配列は `422 validation_failed` となります。履歴の保存に失敗したときはスコアを含めて登録全体をロールバックします。直近のプレイ履歴はユーザーデータ移行の対象外です。
 
@@ -2166,7 +2168,7 @@ curl -X POST \
 | `score` | number | ✓ | スコア (0〜1,010,000) |
 | `clear_lamp` | string \| null | | クリアランプ (`clear`, `hard`, `brave`, `absolute`, `catastrophy`, `null`=FAILED) |
 | `cmb_lv` | number \| null | | コンボランプ (1=NONE, 2=FULL COMBO, 3=ALL JUSTICE) |
-| `fch_lv` | number \| null | | フルチェイン（後方互換のため **1=NONE, 2=PLATINUM, 3=GOLD** として解釈） |
+| `fch_lv` | number \| null | | フルチェイン（**1=NONE, 2=PLATINUM, 3=GOLD, 4=RAINBOW**。4の場合は `cmb_lv=3` が必須） |
 | `slot` | string \| null | | スロット (`best`, `best_candidate`, `new`, `new_candidate`, `null`=none) |
 | `order` | number \| null | | スロット内順序 |
 
@@ -2572,7 +2574,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 | `avg_score` | 全譜面の平均スコア |
 | `hardlamp_count` | 指定ハードランプの達成数 |
 | `combolamp_count` | 指定コンボランプの達成数 |
-| `fullchain_count` | 指定FULL CHAIN種別の達成数 |
+| `fullchain_count` | 指定したFULL CHAINランプ以上の達成譜面数 |
 | `rainbow_count` | BASIC〜MASTERと、存在する場合はULTIMAがすべてALL JUSTICEの楽曲数 |
 | `total_score` | 全譜面のスコア合計 |
 | `overpower_value` | 全譜面のOverPower値合計 |
@@ -2694,7 +2696,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 
 | パラメータ | 型 | 範囲 | 説明 |
 |---|---|---|---|
-| `lamp` | `string` | `GOLD` または `PLATINUM`（完全一致） | FULL CHAIN種別 |
+| `lamp` | `string` | `GOLD`、`PLATINUM`、`RAINBOW`（完全一致） | FULL CHAIN種別 |
 | `count` | `integer \| null` | null または 1〜対象譜面数 | 目標件数。省略/null時は「対象譜面数（動的上限）」として扱います |
 | `remaining` | `integer \| null` | null または 0〜対象譜面数 | 動的上限から差し引く残数 |
 | `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
@@ -2705,8 +2707,9 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 |---|---|
 | `GOLD` | `FULL CHAIN GOLD` |
 | `PLATINUM` | `FULL CHAIN PLATINUM` |
+| `RAINBOW` | `FULL CHAIN RAINBOW` |
 
-指定したFULL CHAIN種別と完全一致する譜面を達成数として扱います。
+達成数は指定したランプ以上を数えます。GOLDは金・鉑・虹、PLATINUMは鉑・虹、RAINBOWは虹が対象です。
 
 #### `rainbow_count`
 
@@ -5215,7 +5218,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "full_chains": [
     { "id": 1, "name": "NONE" },
     { "id": 2, "name": "FULL CHAIN GOLD" },
-    { "id": 3, "name": "FULL CHAIN PLATINUM" }
+    { "id": 3, "name": "FULL CHAIN PLATINUM" },
+    { "id": 4, "name": "FULL CHAIN RAINBOW" }
   ],
   "slots": [
     { "id": 1, "name": "none" },

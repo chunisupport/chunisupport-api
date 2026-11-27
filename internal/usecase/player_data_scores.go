@@ -23,6 +23,10 @@ const (
 // applyScores はプレイヤーのスコア情報を更新します。
 // 通常譜面とWORLD'S END譜面の新規・変更行のみを保存します。
 func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time, beforeStatistics service.PlayerRecordStatisticsSnapshot) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, api_internal.PlayerDataStatistics, calculatedOverpowerSummary, error) {
+	return us.applyScoresWithNewRecordTimes(ctx, tx, playerID, scores, masters, updatedAt, beforeStatistics, nil)
+}
+
+func (us *playerDataUsecase) applyScoresWithNewRecordTimes(ctx context.Context, tx repository.Executor, playerID int, scores PlayerDataScorePayload, masters *playerDataMaster, updatedAt time.Time, beforeStatistics service.PlayerRecordStatisticsSnapshot, newRecordTimes *playLogNewRecordTimes) (api_internal.PlayerDataCounts, []api_internal.SkippedRecord, []api_internal.PlayerDataRecordChange, api_internal.PlayerDataStatistics, calculatedOverpowerSummary, error) {
 	counts, skipped, fullRecordsToUpsert := applyFullScores(playerID, scores.Standard, masters, updatedAt)
 	if err := validateMainSlotRecordsResolved(scores.Standard, fullRecordsToUpsert, masters); err != nil {
 		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
@@ -55,6 +59,7 @@ func (us *playerDataUsecase) applyScores(ctx context.Context, tx repository.Exec
 	if err != nil {
 		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err
 	}
+	applyPlayLogRecordUpdatedAt(fullRecordsToUpsert, fullBefore, worldsendRecordsToUpsert, worldsendBefore, newRecordTimes)
 	rankedChartIDs, err := us.playerDataRepo.FindRankedPlayerRecordChartIDs(ctx, tx, playerID)
 	if err != nil {
 		return counts, skipped, nil, api_internal.PlayerDataStatistics{}, calculatedOverpowerSummary{}, err

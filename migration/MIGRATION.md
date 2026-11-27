@@ -194,7 +194,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - `difficulties`: 譜面難易度マスタ（BASIC、ADVANCED、EXPERT、MASTER、ULTIMA）。
 - `clear_lamp_types`: クリアランプ種別マスタ。
 - `combo_lamp_types`: コンボランプ種別マスタ。
-- `full_chain_types`: フルチェイン種別マスタ（NONE、FULL CHAIN GOLD、FULL CHAIN PLATINUM）。
+- `full_chain_types`: フルチェイン種別マスタ（NONE、FULL CHAIN GOLD、FULL CHAIN PLATINUM、FULL CHAIN RAINBOW）。虹の並び順は3です。ロールバック時に虹を使うレコード・履歴・目標があればマスタを保持します。
 - `class_emblems`: クラスエンブレムマスタ（1、2、3、4、5、inf）。
 - `class_emblem_bases`: クラスエンブレムベースマスタ（1、2、3、4、5、inf）。
 - `possessions`: ポゼッションマスタ（normal、silver、gold、platina、rainbow）。IDは固定値で自動採番しない。

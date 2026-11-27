@@ -445,6 +445,11 @@ func TestResolveFullChainID_fchLvの値に応じてフルチェインIDを解決
 			expectedID: 2,
 		},
 		{
+			name:       "fch_lvが4の場合は虹のマスタIDに解決される",
+			fullChain:  new(4),
+			expectedID: 17,
+		},
+		{
 			name:        "未知のfch_lvはバリデーションエラーになる",
 			fullChain:   new(9),
 			expectedErr: "fch_lv: unknown full chain level: 9",
@@ -932,6 +937,7 @@ func newApplyScoresTestMasters() *playerDataMaster {
 				"none":                {ID: 1, Name: "none"},
 				"full chain gold":     {ID: 2, Name: "full chain gold"},
 				"full chain platinum": {ID: 3, Name: "full chain platinum"},
+				"full chain rainbow":  {ID: 17, Name: "FULL CHAIN RAINBOW"},
 			},
 			Slots: map[string]mastervo.Slot{
 				"none":           {ID: 1, Name: "none"},

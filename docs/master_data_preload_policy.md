@@ -10,7 +10,7 @@
 | `class_emblems` / `class_emblem_bases` | クラスエンブレム種別で件数少、定義済みマスタ。 |
 | `clear_lamp_types` / `combo_lamp_types` | クリア・コンボランプ種別で件数少、定義済みマスタ。 |
 | `slots` | 称号スロット種別、5件の固定マスタ。 |
-| `full_chain_types` | フルチェインランプ種別、3件の固定マスタ。 |
+| `full_chain_types` | フルチェインランプ種別、4件の固定マスタ。 |
 | `honor_types` | 称号の種類マスタで固定値が事前投入されている。 |
 | `account_types` | ユーザー権限区分。4件の固定マスタ（PLAYER/EDITOR/ADMIN/EXTDEV）。 |
 | `versions` | CHUNITHMバージョン名マスタ。未来版を含む全件を読み込み、公開ビューでは読取時点で稼働開始済み（稼働日の日本時間7:00以降。[日付の切り替わり](chunithm_specs/date_boundary.md)）の行だけを返す。管理APIの書込成功後はホットリロードする。 |

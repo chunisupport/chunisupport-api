@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
@@ -21,9 +22,25 @@ func validatePlayLogCount(entries []PlayerDataPlayLogEntry) error {
 	return nil
 }
 
+var (
+	minRecordTimestamp = time.Date(1970, 1, 1, 0, 0, 1, 0, time.UTC)
+	maxRecordTimestamp = time.Date(2038, 1, 19, 3, 14, 7, 0, time.UTC)
+)
+
 type validatedPlayLog struct {
 	entity.PlayerPlayLog
 	title string
+	isNew bool
+}
+
+type playLogUpdatedAtKey struct {
+	chartID int
+	score   int
+}
+
+type playLogNewRecordTimes struct {
+	standard  map[playLogUpdatedAtKey]time.Time
+	worldsend map[playLogUpdatedAtKey]time.Time
 }
 
 func buildPlayLogs(entries []PlayerDataPlayLogEntry, masters *playerDataMaster) ([]validatedPlayLog, error) {
@@ -118,10 +135,11 @@ func buildPlayLog(index int, entry PlayerDataPlayLogEntry, masters *playerDataMa
 			ClearLampID: clearID, ComboLampID: comboID, FullChainID: chainID, PlayedAt: playedAt,
 		},
 		title: title,
+		isNew: *entry.IsNew,
 	}, nil
 }
 
-func (us *playerDataUsecase) replacePlayLogs(ctx context.Context, tx repository.Executor, playerID int, logs []validatedPlayLog) error {
+func (us *playerDataUsecase) resolvePlayLogs(ctx context.Context, tx repository.Executor, logs []validatedPlayLog) ([]validatedPlayLog, error) {
 	var jackets []string
 	for _, log := range logs {
 		if log.Jacket != nil {
@@ -134,13 +152,13 @@ func (us *playerDataUsecase) replacePlayLogs(ctx context.Context, tx repository.
 	if len(jackets) > 0 {
 		candidates, err := us.playerDataRepo.FindPlayLogChartCandidates(ctx, tx, jackets)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, candidate := range candidates {
 			byJacket[candidate.Jacket] = append(byJacket[candidate.Jacket], candidate)
 		}
 	}
-	resolved := make([]entity.PlayerPlayLog, len(logs))
+	resolved := make([]validatedPlayLog, len(logs))
 	for i, log := range logs {
 		var candidates []entity.PlayLogChartCandidate
 		if log.Jacket != nil {
@@ -153,9 +171,83 @@ func (us *playerDataUsecase) replacePlayLogs(ctx context.Context, tx repository.
 				log.ChartID = new(chartID)
 			}
 		}
-		resolved[i] = log.PlayerPlayLog
+		resolved[i] = log
 	}
-	return us.playerDataRepo.ReplacePlayLogs(ctx, tx, playerID, resolved)
+	return resolved, nil
+}
+
+func (us *playerDataUsecase) savePlayLogs(ctx context.Context, tx repository.Executor, playerID int, logs []validatedPlayLog) error {
+	entities := make([]entity.PlayerPlayLog, len(logs))
+	for i, log := range logs {
+		entities[i] = log.PlayerPlayLog
+	}
+	return us.playerDataRepo.ReplacePlayLogs(ctx, tx, playerID, entities)
+}
+
+// buildPlayLogNewRecordTimes は is_new が true のプレイ履歴から、譜面IDとスコアごとの最新プレイ日時を抽出します。
+// MySQL の TIMESTAMP 範囲外や収集日時より未来の時刻は、レコード更新日時として安全に扱えないため除外します。
+func buildPlayLogNewRecordTimes(logs []validatedPlayLog, collectedAt time.Time) *playLogNewRecordTimes {
+	times := &playLogNewRecordTimes{
+		standard:  make(map[playLogUpdatedAtKey]time.Time),
+		worldsend: make(map[playLogUpdatedAtKey]time.Time),
+	}
+	for _, log := range logs {
+		if !log.isNew || !isValidRecordTimestamp(log.PlayedAt) || log.PlayedAt.After(collectedAt) {
+			continue
+		}
+		if log.ChartID != nil {
+			recordLatestPlayedAt(times.standard, playLogUpdatedAtKey{chartID: *log.ChartID, score: log.Score}, log.PlayedAt)
+		} else if log.WorldsendChartID != nil {
+			recordLatestPlayedAt(times.worldsend, playLogUpdatedAtKey{chartID: *log.WorldsendChartID, score: log.Score}, log.PlayedAt)
+		}
+	}
+	return times
+}
+
+func isValidRecordTimestamp(t time.Time) bool {
+	return !t.Before(minRecordTimestamp) && !t.After(maxRecordTimestamp)
+}
+
+func recordLatestPlayedAt(dest map[playLogUpdatedAtKey]time.Time, key playLogUpdatedAtKey, playedAt time.Time) {
+	if prev, exists := dest[key]; !exists || playedAt.After(prev) {
+		dest[key] = playedAt
+	}
+}
+
+// applyPlayLogRecordUpdatedAt は is_new のプレイ履歴から得られる実際の更新日時を新規・更新レコードへ反映します。
+// 既存レコードでは履歴タイムラインの逆転や同秒重複を防ぐため、前回の更新日時より新しい場合のみ採用します。
+func applyPlayLogRecordUpdatedAt(
+	fullRecords []repository.PlayerRecordForUpsert,
+	fullBefore map[int]repository.PlayerRecordState,
+	worldsendRecords []repository.WorldsendRecordForUpsert,
+	worldsendBefore map[int]repository.WorldsendRecordState,
+	newRecordTimes *playLogNewRecordTimes,
+) {
+	if newRecordTimes == nil {
+		return
+	}
+	for i := range fullRecords {
+		rec := &fullRecords[i]
+		playedAt, ok := newRecordTimes.standard[playLogUpdatedAtKey{chartID: rec.ChartID, score: rec.State.Score}]
+		if !ok {
+			continue
+		}
+		if before, exists := fullBefore[rec.ChartID]; exists && !playedAt.After(before.UpdatedAt) {
+			continue
+		}
+		rec.State.UpdatedAt = playedAt
+	}
+	for i := range worldsendRecords {
+		rec := &worldsendRecords[i]
+		playedAt, ok := newRecordTimes.worldsend[playLogUpdatedAtKey{chartID: rec.ChartID, score: rec.State.Score}]
+		if !ok {
+			continue
+		}
+		if before, exists := worldsendBefore[rec.ChartID]; exists && !playedAt.After(before.UpdatedAt) {
+			continue
+		}
+		rec.State.UpdatedAt = playedAt
+	}
 }
 
 func resolvePlayLogChart(log validatedPlayLog, byJacket []entity.PlayLogChartCandidate) (int, bool) {

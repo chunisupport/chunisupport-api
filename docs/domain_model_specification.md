@@ -356,7 +356,7 @@ WORLD'S END 楽曲に対する専用譜面情報を表すエンティティ。�
 - **ChartDifficulty**: 譜面難易度（BASIC, ADVANCED, EXPERT, MASTER, ULTIMA）
 - **ClearLampType**: クリアランプ種別（FAILED, CLEAR, HARD, BRAVE, ABSOLUTE, CATASTROPHY）
 - **ComboLampType**: コンボランプ種別（NONE, FULL COMBO, ALL JUSTICE）
-- **FullChainType**: フルチェーン種別（NONE, FULL CHAIN GOLD, FULL CHAIN PLATINUM）
+- **FullChainType**: フルチェーン種別（NONE, FULL CHAIN GOLD, FULL CHAIN PLATINUM, FULL CHAIN RAINBOW）
 - **Genre**: 楽曲ジャンル
 - **Slot**: レーティング枠種別（none, best, best_candidate, new, new_candidate）
 - **ClassEmblem**: クラスエンブレム（称号）

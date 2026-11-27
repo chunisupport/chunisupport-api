@@ -182,6 +182,20 @@ func TestToRecordsShowAllResponse(t *testing.T) {
 	assert.True(t, record.IsPlayed)
 }
 
+func TestToRecordsShowAllResponse_虹FULLCHAINを互換フラグに反映する(t *testing.T) {
+	records := []*dto.PlayerRecordDTO{{
+		UpdatedAt:  new(time.Date(2026, 11, 27, 0, 0, 0, 0, time.UTC)),
+		IsPlayed:   true,
+		Difficulty: "MASTER",
+		FullChain:  new("FULL CHAIN RAINBOW"),
+	}}
+
+	result := ToRecordsShowAllResponse(records, nil, time.UTC)
+
+	require.Len(t, result.Records, 1)
+	assert.True(t, result.Records[0].IsFullChain)
+}
+
 func TestToRecordsShowAllResponse_ClearLampFlags(t *testing.T) {
 	tests := []struct {
 		name      string
