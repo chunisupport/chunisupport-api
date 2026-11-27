@@ -14,6 +14,7 @@ import (
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/chartconstant"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/score"
 	"github.com/chunisupport/chunisupport-api/internal/info"
@@ -817,7 +818,7 @@ func (s *stubHonorRepositoryForApplyHonorsTest) FindAll(_ context.Context, _ rep
 	return []*entity.Honor{}, nil
 }
 
-func (s *stubHonorRepositoryForApplyHonorsTest) FindByID(_ context.Context, _ repository.Executor, _ int) (*entity.Honor, error) {
+func (s *stubHonorRepositoryForApplyHonorsTest) FindByDisplayID(_ context.Context, _ repository.Executor, _ displayid.DisplayID) (*entity.Honor, error) {
 	return nil, repository.ErrHonorNotFound
 }
 
@@ -829,7 +830,7 @@ func (s *stubHonorRepositoryForApplyHonorsTest) Save(_ context.Context, _ reposi
 	return nil
 }
 
-func (s *stubHonorRepositoryForApplyHonorsTest) Delete(_ context.Context, _ repository.Executor, _ int) error {
+func (s *stubHonorRepositoryForApplyHonorsTest) DeleteByDisplayID(_ context.Context, _ repository.Executor, _ displayid.DisplayID) error {
 	return nil
 }
 

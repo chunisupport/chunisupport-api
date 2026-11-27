@@ -211,7 +211,7 @@ func TestUserDataTransferRepositoryImportSnapshotReusesExistingHonor(t *testing.
 	require.NoError(t, err)
 	_, err = db.Exec("INSERT INTO honor_types (id, name) VALUES (1, 'normal')")
 	require.NoError(t, err)
-	_, err = db.Exec("INSERT INTO honors (id, name, honor_type_id, image_url) VALUES (10, '登録済み称号', 1, NULL)")
+	_, err = db.Exec("INSERT INTO honors (id, display_id, name, honor_type_id, image_url) VALUES (10, '000000000000000a', '登録済み称号', 1, NULL)")
 	require.NoError(t, err)
 	repo := NewUserDataTransferRepository(db)
 	snapshot := emptyTransferRepositorySnapshot(t)
@@ -292,7 +292,7 @@ func TestUserDataTransferRepositoryExportAuxiliaryPlayerDataTreatsEmptyHonorImag
 	db := newTransferRepositoryTestDB(t)
 	_, err := db.Exec(`INSERT INTO honor_types (id, name) VALUES (1, 'normal')`)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO honors (id, name, honor_type_id, image_url) VALUES (1, '称号', 1, '')`)
+	_, err = db.Exec(`INSERT INTO honors (id, display_id, name, honor_type_id, image_url) VALUES (1, '0000000000000001', '称号', 1, '')`)
 	require.NoError(t, err)
 	_, err = db.Exec(`INSERT INTO player_honors (player_id, honor_id, slot, created_at) VALUES (10, 1, 1, '2026-08-01 00:00:00')`)
 	require.NoError(t, err)
@@ -527,9 +527,9 @@ func newTransferRepositoryTestDB(t *testing.T) *sqlx.DB {
 		"INSERT INTO possessions (id, name) VALUES (1, 'normal'), (2, 'silver'), (3, 'gold'), (4, 'platina'), (5, 'rainbow')",
 		"CREATE TABLE achievement_types (id INTEGER PRIMARY KEY, code TEXT)",
 		"CREATE TABLE genres (id INTEGER PRIMARY KEY, name TEXT)",
-		"CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT)",
+		"CREATE TABLE versions (id INTEGER PRIMARY KEY, display_id TEXT, name TEXT)",
 		"CREATE TABLE honor_types (id INTEGER PRIMARY KEY, name TEXT)",
-		"CREATE TABLE honors (id INTEGER PRIMARY KEY, name TEXT, honor_type_id INTEGER, image_url TEXT NULL, UNIQUE(name, honor_type_id), UNIQUE(image_url))",
+		"CREATE TABLE honors (id INTEGER PRIMARY KEY, display_id TEXT NOT NULL UNIQUE, name TEXT, honor_type_id INTEGER, image_url TEXT NULL, UNIQUE(name, honor_type_id), UNIQUE(image_url))",
 		"CREATE TABLE player_metric_histories (player_id INTEGER, official_rating REAL, official_overpower REAL, official_overpower_percent REAL NULL, data_collected_at DATETIME)",
 		"CREATE TABLE player_course_records (player_id INTEGER, course_id INTEGER, score INTEGER, is_clear INTEGER, combo_lamp_id INTEGER, updated_at DATETIME)",
 		"CREATE TABLE player_course_record_histories (player_id INTEGER, course_id INTEGER, score INTEGER, is_clear INTEGER, combo_lamp_id INTEGER, updated_at DATETIME)",

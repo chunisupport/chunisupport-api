@@ -3,6 +3,7 @@ package api_internal_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,10 +11,12 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/app/handler/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/ratingband"
 	"github.com/chunisupport/chunisupport-api/internal/dto"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type mockMasterDataUsecase struct {
@@ -98,6 +101,7 @@ func TestMasterDataHandler_GetHonorTypes(t *testing.T) {
 	assert.Len(t, response.HonorTypes, 2)
 	assert.Equal(t, "normal", response.HonorTypes[0].Name)
 	assert.Equal(t, "gold", response.HonorTypes[1].Name)
+	assertNoNumericID(t, rec.Body.Bytes())
 	usecaseMock.AssertExpectations(t)
 }
 
@@ -109,7 +113,7 @@ func TestMasterDataHandler_GetMasterData_UsesVersionDTOShape(t *testing.T) {
 	releasedAt := time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)
 	usecaseMock.On("GetMasterData", mock.Anything).Return(&usecase.MasterDataOutput{
 		Versions: []masterdata.Version{
-			{ID: 1, Name: "CHUNITHM", ShortName: "ORI", ReleasedAt: releasedAt},
+			{ID: 1, DisplayID: "0123456789abcdef", Name: "CHUNITHM", ShortName: "ORI", ReleasedAt: releasedAt},
 		},
 		Genres:           []masterdata.Genre{{ID: 1, Name: "POPS & ANIME", ShortName: "P&A"}},
 		Difficulties:     []masterdata.Item{},
@@ -133,10 +137,10 @@ func TestMasterDataHandler_GetMasterData_UsesVersionDTOShape(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "\"versions\":[{\"id\":1,\"name\":\"CHUNITHM\",\"short_name\":\"ORI\",\"released_at\":\"2015-07-16\"}]")
+	assert.Contains(t, rec.Body.String(), "\"versions\":[{\"id\":\"0123456789abcdef\",\"name\":\"CHUNITHM\",\"short_name\":\"ORI\",\"released_at\":\"2015-07-16\"}]")
 	var response dto.MasterDataResponse
 	assert.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-	assert.Equal(t, []*dto.GenreDTO{{ID: 1, Name: "POPS & ANIME", ShortName: "P&A"}}, response.Genres)
+	assert.Equal(t, []*dto.GenreDTO{{Name: "POPS & ANIME", ShortName: "P&A"}}, response.Genres)
 	usecaseMock.AssertExpectations(t)
 }
 
@@ -186,6 +190,90 @@ func TestMasterDataHandler_GetGenres(t *testing.T) {
 	// Then
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"genres":[{"id":1,"name":"POPS & ANIME","short_name":"P&A"},{"id":2,"name":"niconico","short_name":"nico"}]}`, rec.Body.String())
+	assert.JSONEq(t, `{"genres":[{"name":"POPS & ANIME","short_name":"P&A"},{"name":"niconico","short_name":"nico"}]}`, rec.Body.String())
 	usecaseMock.AssertExpectations(t)
+}
+
+func TestMasterDataHandler_GetMasterData_DBの数値IDを含めない(t *testing.T) {
+	// Given: すべてのマスタに内部IDを持つ項目がある
+	e := newTestEcho()
+	usecaseMock := new(mockMasterDataUsecase)
+	handler := api_internal.NewMasterDataHandler(usecaseMock)
+	item := []masterdata.Item{{ID: 99, Name: "item"}}
+	minRating := 15.0
+	band := &ratingband.RatingBand{ID: 7, Label: "15.00", MinInclusive: &minRating, SortOrder: 1}
+	usecaseMock.On("GetMasterData", mock.Anything).Return(&usecase.MasterDataOutput{
+		NameFolders:      []masterdata.NameFolder{{ID: 99, Code: "A", Name: "あ行", SortOrder: 1}},
+		Genres:           []masterdata.Genre{{ID: 99, Name: "POPS & ANIME", ShortName: "P&A"}},
+		Difficulties:     item,
+		AccountTypes:     item,
+		Versions:         []masterdata.Version{{ID: 99, DisplayID: "0123456789abcdef", Name: "CHUNITHM", ShortName: "ORI", ReleasedAt: time.Date(2015, 7, 16, 0, 0, 0, 0, time.UTC)}},
+		RatingBands:      []*ratingband.RatingBand{band},
+		AchievementTypes: item,
+		ClassEmblems:     item,
+		ClassEmblemBases: item,
+		ClearLamps:       item,
+		ComboLamps:       item,
+		FullChains:       item,
+		Slots:            item,
+		HonorTypes:       item,
+		Possessions:      item,
+	}).Once()
+	rec := httptest.NewRecorder()
+
+	// When
+	err := handler.GetMasterData(e.NewContext(httptest.NewRequest(http.MethodGet, "/internal/master", nil), rec))
+
+	// Then: どの経路にも数値の id がなく、バージョンの id は公開IDになる
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assertNoNumericID(t, rec.Body.Bytes())
+	var response dto.MasterDataResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	require.Len(t, response.Versions, 1)
+	assert.Equal(t, "0123456789abcdef", response.Versions[0].ID)
+	usecaseMock.AssertExpectations(t)
+}
+
+func TestMasterDataHandler_GetGenres_DBの数値IDを含めない(t *testing.T) {
+	// Given
+	e := newTestEcho()
+	usecaseMock := new(mockMasterDataUsecase)
+	handler := api_internal.NewMasterDataHandler(usecaseMock)
+	usecaseMock.On("GetGenres", mock.Anything).Return([]masterdata.Genre{{ID: 99, Name: "POPS & ANIME", ShortName: "P&A"}}).Once()
+	rec := httptest.NewRecorder()
+
+	// When
+	err := handler.GetGenres(e.NewContext(httptest.NewRequest(http.MethodGet, "/internal/master/genres", nil), rec))
+
+	// Then
+	require.NoError(t, err)
+	assertNoNumericID(t, rec.Body.Bytes())
+	usecaseMock.AssertExpectations(t)
+}
+
+// assertNoNumericID はJSONのどの階層にも数値の id キーがないことを確認します。
+// DBの数値主キーをAPIに含めない契約の回帰テストに使います。
+func assertNoNumericID(t *testing.T, body []byte) {
+	t.Helper()
+	var decoded any
+	require.NoError(t, json.Unmarshal(body, &decoded))
+	var walk func(path string, value any)
+	walk = func(path string, value any) {
+		switch typed := value.(type) {
+		case map[string]any:
+			for key, child := range typed {
+				if key == "id" {
+					_, isNumber := child.(float64)
+					assert.False(t, isNumber, "%s.id に数値IDが含まれています", path)
+				}
+				walk(path+"."+key, child)
+			}
+		case []any:
+			for i, child := range typed {
+				walk(fmt.Sprintf("%s[%d]", path, i), child)
+			}
+		}
+	}
+	walk("$", decoded)
 }

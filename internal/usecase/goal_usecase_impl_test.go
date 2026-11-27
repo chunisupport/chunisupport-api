@@ -11,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	mastervo "github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -170,6 +171,12 @@ func (s *trackingTM) Transactional(ctx context.Context, f func(tx repository.Exe
 	return f(s.passedFloor)
 }
 
+// テスト用バージョンの公開IDです。目標の ver はDBの数値IDではなくこの値で指定します。
+const (
+	testVerseDisplayID    = "0000000000000a20"
+	testVerseEP2DisplayID = "0000000000000a21"
+)
+
 type stubGoalMasterProvider struct{}
 
 type stubMissingTypeMasterProvider struct{}
@@ -194,9 +201,18 @@ func (s *stubGoalMasterProvider) GoalMasters() *domainmasterdata.GoalMasters {
 			"overpower_percent": {ID: 8, Name: "overpower_percent"},
 		},
 		AchievementTypesByID: map[int]string{1: "rank_count", 2: "score_count", 4: "avg_score", 6: "total_score", 7: "overpower_value", 8: "overpower_percent", 9: "rainbow_count", 10: "fullchain_count", 11: "rating_count"},
-		DifficultyNamesByID:  map[int]string{3: "EXPERT", 4: "MASTER"},
-		GenreNamesByID:       map[int]string{1: "POPS & ANIME", 2: "niconico"},
-		VersionsByID:         map[int]domainmasterdata.Version{20: {ID: 20, Name: "VERSE", ReleasedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)}, 21: {ID: 21, Name: "VERSE EP. II", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		Difficulties: map[string]mastervo.ChartDifficulty{
+			"EXPERT": {ID: 3, Name: "EXPERT", SortOrder: 2},
+			"MASTER": {ID: 4, Name: "MASTER", SortOrder: 3},
+		},
+		Genres: map[string]mastervo.Genre{
+			"POPS & ANIME": {ID: 1, Name: "POPS & ANIME", SortOrder: 0},
+			"niconico":     {ID: 2, Name: "niconico", SortOrder: 1},
+		},
+		VersionsByDisplayID: map[string]domainmasterdata.Version{
+			testVerseDisplayID:    {ID: 20, DisplayID: testVerseDisplayID, Name: "VERSE", ReleasedAt: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)},
+			testVerseEP2DisplayID: {ID: 21, DisplayID: testVerseEP2DisplayID, Name: "VERSE EP. II", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)},
+		},
 		NameFoldersByCode: map[string]domainmasterdata.NameFolder{
 			"ABCD":   {ID: 1, Code: "ABCD", Name: "ABCD", SortOrder: 1},
 			"A":      {ID: 7, Code: "A", Name: "あ行", SortOrder: 7},
@@ -218,7 +234,7 @@ func TestGoalUsecase_Create(t *testing.T) {
 		Title:             "  test  ",
 		AchievementType:   "score_count",
 		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"diff":4,"genre":1,"ver":20}`),
+		Attributes:        []byte(`{"diff":"MASTER","genre":"POPS & ANIME","ver":"0000000000000a20"}`),
 		InvertValue:       true,
 		InvertPercentage:  false,
 	}
@@ -465,7 +481,7 @@ func TestGoalUsecase_UpdateNotFoundOnSave(t *testing.T) {
 		Title:             "updated",
 		AchievementType:   "score_count",
 		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"diff":4,"genre":1,"ver":20}`),
+		Attributes:        []byte(`{"diff":"MASTER","genre":"POPS & ANIME","ver":"0000000000000a20"}`),
 	})
 	assert.True(t, errors.Is(err, ErrGoalNotFound))
 }
@@ -489,15 +505,15 @@ func TestGoalUsecase_CreateInvalidDifficultyAttribute(t *testing.T) {
 		Title:             "test",
 		AchievementType:   "score_count",
 		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"diff":5,"genre":1,"ver":20}`),
+		Attributes:        []byte(`{"diff":"ULTIMA","genre":"POPS & ANIME","ver":"0000000000000a20"}`),
 	})
 	assert.True(t, errors.Is(err, ErrInvalidGoalAttributes))
 }
 
 func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 	// バージョン期間の期待値はマスタの開始日から手で求めた固定値である。
-	// VERSE(20)は2024-01-01開始、次のバージョン(21)は2025-01-01開始のため、
-	// 20の期間は2024-01-01から2025-01-01まで、最新21の期間の終わりは無い。
+	// VERSEは2024-01-01開始、次のバージョン（VERSE EP. II）は2025-01-01開始のため、
+	// VERSEの期間は2024-01-01から2025-01-01まで、最新のVERSE EP. IIの期間の終わりは無い。
 	verseFrom := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
 	verseEP2From := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
 	tests := []struct {
@@ -511,33 +527,57 @@ func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 	}{
 		{
 			name:               "難易度を単一要素配列で指定するとスカラーに正規化される",
-			attributes:         []byte(`{"diff":[4]}`),
-			expectedAttributes: map[string]any{"diff": float64(4)},
+			attributes:         []byte(`{"diff":["MASTER"]}`),
+			expectedAttributes: map[string]any{"diff": "MASTER"},
 			expectError:        false,
 		},
 		{
-			name:                  "難易度を複数配列で指定できる",
-			attributes:            []byte(`{"diff":[3,4]}`),
-			expectedAttributes:    map[string]any{"diff": []any{float64(3), float64(4)}},
+			name:                  "難易度を複数配列で指定すると表示順に正規化される",
+			attributes:            []byte(`{"diff":["MASTER","EXPERT"]}`),
+			expectedAttributes:    map[string]any{"diff": []any{"EXPERT", "MASTER"}},
 			expectError:           false,
 			expectedDifficultyIDs: []int{3, 4},
 		},
 		{
-			name:               "ジャンルを複数配列で指定できる",
-			attributes:         []byte(`{"genre":[1,2]}`),
-			expectedAttributes: map[string]any{"genre": []any{float64(1), float64(2)}},
+			name:               "ジャンルを複数配列で指定すると表示順に正規化される",
+			attributes:         []byte(`{"genre":["niconico","POPS & ANIME"]}`),
+			expectedAttributes: map[string]any{"genre": []any{"POPS & ANIME", "niconico"}},
 			expectError:        false,
 			expectedGenreIDs:   []int{1, 2},
 		},
 		{
-			name:               "バージョンを複数配列で指定できる",
-			attributes:         []byte(`{"ver":[20,21]}`),
-			expectedAttributes: map[string]any{"ver": []any{float64(20), float64(21)}},
+			name:               "バージョンを複数配列で指定すると稼働日順に正規化される",
+			attributes:         []byte(`{"ver":["0000000000000a21","0000000000000a20"]}`),
+			expectedAttributes: map[string]any{"ver": []any{testVerseDisplayID, testVerseEP2DisplayID}},
 			expectError:        false,
 			expectedVersionRanges: []repository.VersionRange{
 				{From: verseFrom, To: &verseEP2From},
 				{From: verseEP2From, To: nil},
 			},
+		},
+		{
+			name:               "難易度をDBの数値IDで指定するとエラーになる",
+			attributes:         []byte(`{"diff":4}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+		{
+			name:               "ジャンルをDBの数値ID配列で指定するとエラーになる",
+			attributes:         []byte(`{"genre":[1,2]}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+		{
+			name:               "バージョンをDBの数値IDで指定するとエラーになる",
+			attributes:         []byte(`{"ver":20}`),
+			expectedAttributes: nil,
+			expectError:        true,
+		},
+		{
+			name:               "バージョンを名称で指定するとエラーになる",
+			attributes:         []byte(`{"ver":"VERSE"}`),
+			expectedAttributes: nil,
+			expectError:        true,
 		},
 		{
 			name:               "楽曲名順を単一コードで指定できる",
@@ -577,13 +617,13 @@ func TestGoalUsecase_CreateAttributeIntOrSliceNormalization(t *testing.T) {
 		},
 		{
 			name:               "難易度配列の重複は除去されスカラーに正規化される",
-			attributes:         []byte(`{"diff":[4,4]}`),
-			expectedAttributes: map[string]any{"diff": float64(4)},
+			attributes:         []byte(`{"diff":["MASTER","MASTER"]}`),
+			expectedAttributes: map[string]any{"diff": "MASTER"},
 			expectError:        false,
 		},
 		{
-			name:               "存在しない難易度IDを含む配列はエラーになる",
-			attributes:         []byte(`{"diff":[4,99]}`),
+			name:               "存在しない難易度名を含む配列はエラーになる",
+			attributes:         []byte(`{"diff":["MASTER","ULTIMA"]}`),
 			expectedAttributes: nil,
 			expectError:        true,
 		},
@@ -684,7 +724,7 @@ func TestGoalUsecase_CreateRejectsOPTargetWithDifficulty(t *testing.T) {
 		Title:             "OP対象",
 		AchievementType:   "overpower_value",
 		AchievementParams: []byte(`{"total":10.0}`),
-		Attributes:        []byte(`{"chart_target":"OP_TARGET","diff":[3,4]}`),
+		Attributes:        []byte(`{"chart_target":"OP_TARGET","diff":["EXPERT","MASTER"]}`),
 	})
 
 	// Then
@@ -1114,7 +1154,7 @@ func TestGoalUsecase_CreateRejectsRainbowCountOverSongUpperBound(t *testing.T) {
 		Title:             "虹枠",
 		AchievementType:   "rainbow_count",
 		AchievementParams: []byte(`{"count":3}`),
-		Attributes:        []byte(`{"genre":1,"ver":20}`),
+		Attributes:        []byte(`{"genre":"POPS & ANIME","ver":"0000000000000a20"}`),
 	})
 
 	// Then
@@ -1143,7 +1183,7 @@ func TestGoalUsecase_CreateRejectsChartAttributesForRainbowCount(t *testing.T) {
 		name       string
 		attributes []byte
 	}{
-		{name: "難易度を拒否する", attributes: []byte(`{"diff":4}`)},
+		{name: "難易度を拒否する", attributes: []byte(`{"diff":"MASTER"}`)},
 		{name: "譜面定数を拒否する", attributes: []byte(`{"const":{"min":1.0,"max":16.0}}`)},
 		{name: "OP対象を拒否する", attributes: []byte(`{"chart_target":"OP_TARGET"}`)},
 		{name: "譜面定数の入力モードを拒否する", attributes: []byte(`{"const_filter_mode":"level"}`)},
@@ -1251,7 +1291,7 @@ func TestGoalUsecase_CreateAcceptsValueAtDynamicUpperBound(t *testing.T) {
 			name:            "rainbow_countのcountが対象楽曲数ちょうどを受理する",
 			achievementType: "rainbow_count",
 			params:          []byte(`{"count":2}`),
-			attributes:      []byte(`{"genre":1,"ver":20}`),
+			attributes:      []byte(`{"genre":"POPS & ANIME","ver":"0000000000000a20"}`),
 			stats:           &repository.GoalTargetStats{ChartCount: 10, SongCount: 2},
 			expectedParams:  `{"count":2}`,
 		},
@@ -1825,7 +1865,7 @@ func TestGoalUsecase_Update(t *testing.T) {
 		Title:             "updated",
 		AchievementType:   "score_count",
 		AchievementParams: []byte(`{"score":1000000,"count":1}`),
-		Attributes:        []byte(`{"diff":4,"genre":1,"ver":20}`),
+		Attributes:        []byte(`{"diff":"MASTER","genre":"POPS & ANIME","ver":"0000000000000a20"}`),
 	})
 
 	// Then: トランザクションマネージャが使用され、更新された内容が返却される
