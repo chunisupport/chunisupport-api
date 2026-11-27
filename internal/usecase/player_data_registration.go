@@ -184,13 +184,24 @@ func (us *playerDataUsecase) Register(ctx context.Context, user *entity.User, pa
 		registeredSPHonors = registeredHonors
 		skippedRecords = append(skippedRecords, honorSkipped...)
 
-		counts, scoreSkipped, changes, statistics, overpowerSummary, scoreErr := us.applyScores(ctx, tx, playerID, payload.Scores, masters, updatedAt, beforeStatistics)
+		var resolvedPlayLogs []validatedPlayLog
+		var newRecordTimes *playLogNewRecordTimes
+		// 再送時はマスタの更新だけで保存済みの紐付けが変わらないようにします。
+		if !replayed {
+			var resolveErr error
+			resolvedPlayLogs, resolveErr = us.resolvePlayLogs(ctx, tx, playLogs)
+			if resolveErr != nil {
+				return resolveErr
+			}
+			newRecordTimes = buildPlayLogNewRecordTimes(resolvedPlayLogs, updatedAt)
+		}
+
+		counts, scoreSkipped, changes, statistics, overpowerSummary, scoreErr := us.applyScoresWithNewRecordTimes(ctx, tx, playerID, payload.Scores, masters, updatedAt, beforeStatistics, newRecordTimes)
 		if scoreErr != nil {
 			return scoreErr
 		}
-		// 再送時はマスタの更新だけで保存済みの紐付けが変わらないようにします。
 		if !replayed {
-			if err := us.replacePlayLogs(ctx, tx, playerID, playLogs); err != nil {
+			if err := us.savePlayLogs(ctx, tx, playerID, resolvedPlayLogs); err != nil {
 				return err
 			}
 		}

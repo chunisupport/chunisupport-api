@@ -25,6 +25,20 @@ func TestUserDataTransferSnapshotValidate(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("虹FULL CHAINはALL JUSTICEとの組み合わせだけを受理する", func(t *testing.T) {
+		snapshot := validUserDataTransferSnapshot(t)
+		record := &snapshot.Records[0]
+		record.Score = score.Score(1_009_000)
+		record.FullChainName = "FULL CHAIN RAINBOW"
+		record.ComboLampName = "ALL JUSTICE"
+		require.NoError(t, snapshot.Validate())
+
+		record.ComboLampName = "FULL COMBO"
+		err := snapshot.Validate()
+		assert.ErrorIs(t, err, ErrInvalidUserDataTransfer)
+		assert.ErrorContains(t, err, "records[0].full_chain_name requires ALL JUSTICE")
+	})
+
 	t.Run("トップレベル配列がnilなら拒否する", func(t *testing.T) {
 		snapshot := validUserDataTransferSnapshot(t)
 		snapshot.Records = nil

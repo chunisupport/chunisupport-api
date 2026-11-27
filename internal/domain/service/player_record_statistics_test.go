@@ -35,6 +35,23 @@ func TestCalculatePlayerRecordStatistics_全体と難易度別に累積集計す
 	assert.Zero(t, result.ByDifficulty["ADVANCED"].TotalHighScore)
 }
 
+func TestCalculatePlayerRecordStatistics_鉑から虹に変わってもFCH件数を維持する(t *testing.T) {
+	standard := newStatisticsRecord(t, "MASTER", 1009000, "CLEAR", "ALL JUSTICE", "FULL CHAIN PLATINUM")
+	worldsend := newWorldsendStatisticsRecord(t, 1009000, "CLEAR", "ALL JUSTICE", "FULL CHAIN PLATINUM")
+	before, err := CalculatePlayerRecordStatistics([]*entity.PlayerRecord{standard}, []*entity.PlayerWorldsendRecord{worldsend})
+	require.NoError(t, err)
+
+	standard.FullChain = &entity.FullChainType{Name: "FULL CHAIN RAINBOW"}
+	worldsend.FullChain = &entity.FullChainType{Name: "FULL CHAIN RAINBOW"}
+	after, err := CalculatePlayerRecordStatistics([]*entity.PlayerRecord{standard}, []*entity.PlayerWorldsendRecord{worldsend})
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, after.Overall.Achievements.FCH)
+	assert.Equal(t, 1, after.ByDifficulty["MASTER"].Achievements.FCH)
+	assert.Equal(t, 1, after.ByDifficulty["WE"].Achievements.FCH)
+	assert.Equal(t, before, after)
+}
+
 func TestCalculatePlayerRecordStatistics_スコア境界値を集計する(t *testing.T) {
 	tests := []struct {
 		name     string

@@ -64,6 +64,8 @@ type Handlers struct {
 	Course                *api_internal.CourseHandler
 	CourseStats           *api_internal.CourseStatsHandler
 	SystemMaintenance     *api_internal.SystemMaintenanceHandler
+	AppAnnouncement       *api_internal.AppAnnouncementHandler
+	AdminAppAnnouncement  *api_internal.AdminAppAnnouncementHandler
 	SongBatch             *api_internal.SongBatchHandler
 	ChartStatsBatch       *api_internal.ChartStatsBatchHandler
 	// 外部API v1 用ハンドラ
@@ -105,6 +107,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 	playerRecordRepo := infra.NewPlayerRecordRepository(db)
 	worldsendRecordRepo := infra.NewWorldsendRecordRepository(db)
 	playerDataRepo := infra.NewPlayerDataRepository(db)
+	appAnnouncementRepo := infra.NewAppAnnouncementRepository(db)
 	scoreHistoryRepo := infra.NewScoreHistoryRepository(db)
 	playerMetricHistoryQuery := infra.NewPlayerMetricHistoryQueryService(db)
 	worldsendChartRepo := infra.NewWorldsendChartRepository(db)
@@ -270,6 +273,8 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 		Course:                api_internal.NewCourseHandler(courseUsecase),
 		CourseStats:           api_internal.NewCourseStatsHandler(courseStatsUsecase, chartStatsMasterProvider),
 		SystemMaintenance:     api_internal.NewSystemMaintenanceHandler(systemMaintenanceUsecase),
+		AppAnnouncement:       api_internal.NewAppAnnouncementHandler(usecase.NewAppAnnouncementUsecase(appAnnouncementRepo)),
+		AdminAppAnnouncement:  api_internal.NewAdminAppAnnouncementHandler(usecase.NewAdminAppAnnouncementUsecase(appAnnouncementRepo)),
 		SongBatch:             api_internal.NewSongBatchHandler(songBatchJobUsecase),
 		ChartStatsBatch:       api_internal.NewChartStatsBatchHandler(chartStatsBatchJobUsecase),
 		V1Song:                api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),

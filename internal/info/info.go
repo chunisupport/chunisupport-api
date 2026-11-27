@@ -357,10 +357,13 @@ var ComboLampNameToAbbrev = map[string]string{
 	"ALL JUSTICE": "AJ",
 }
 
+const PlayerDataFullChainRainbowLevel = 4
+
 // FullChainAbbrevToName はAPI略称→マスタ名（full_chain_types.name）への変換テーブルです。
 var FullChainAbbrevToName = map[string]string{
 	"GOLD":     "FULL CHAIN GOLD",
 	"PLATINUM": "FULL CHAIN PLATINUM",
+	"RAINBOW":  constants.FullChainRainbowName,
 }
 
 // CalcTheoreticalOverpowerTotal は対象譜面群の理論値OVER POWER合計を計算します。

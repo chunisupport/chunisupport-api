@@ -164,7 +164,7 @@ DBの数値IDはレスポンスに含めない。`profile` のマスタ参照は
 | `aj` | コンボランプ名が `ALL JUSTICE` |
 | `fc` | コンボランプ名が `FULL COMBO` または `ALL JUSTICE` |
 | `clr` | クリアランプ名が `FAILED` 以外 |
-| `fch` | フルチェイン名が `FULL CHAIN GOLD` または `FULL CHAIN PLATINUM` |
+| `fch` | フルチェイン名が `FULL CHAIN GOLD`、`FULL CHAIN PLATINUM`、`FULL CHAIN RAINBOW` のいずれか |
 | `max` | スコアが1,010,000と等しい |
 | `sss_plus` | スコアが1,009,000以上 |
 | `sss` | スコアが1,007,500以上 |

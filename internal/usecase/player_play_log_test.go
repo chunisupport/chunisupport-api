@@ -195,6 +195,232 @@ func TestRegister_PlayLog(t *testing.T) {
 	}
 }
 
+func TestRegister_PlayLogIsNewUpdatedAt(t *testing.T) {
+	collectedAt := time.Date(2026, 9, 1, 10, 0, 0, 0, time.UTC)
+	playedAtJST := "2026/09/01 18:42"
+	playedAtUTC := time.Date(2026, 9, 1, 9, 42, 0, 0, time.UTC)
+
+	newFixtureWithCandidates := func(t *testing.T) (*registrationFixture, *playLogRegistrationRepository) {
+		t.Helper()
+		fx := newRegistrationFixture(t)
+		fx.payload.UpdatedAt = collectedAt.Format(time.RFC3339)
+		repo := &playLogRegistrationRepository{
+			registrationDataRepository: fx.data,
+			candidates: []entity.PlayLogChartCandidate{
+				{ID: 101, Title: "Full Song", Jacket: "jacket", DifficultyID: 4},
+				{ID: 201, Title: "World Song", Jacket: "we-jacket"},
+			},
+		}
+		fx.uc.playerDataRepo = repo
+		return fx, repo
+	}
+
+	t.Run("新規レコードはis_newかつスコア一致のplayed_atを更新日時に使う", func(t *testing.T) {
+		fx, _ := newFixtureWithCandidates(t)
+		fx.payload.Scores.Standard = []PlayerDataScoreEntry{
+			{Idx: "full-song", Diff: "MASTER", Score: 1005000, Slot: new("best"), Order: new(1)},
+		}
+		fx.payload.Scores.Worldsend = []PlayerDataScoreEntry{
+			{Idx: "world-song", Diff: "WE", Score: 995000},
+		}
+		stdLog := validPlayLogEntry()
+		stdLog.Score = new(1005000)
+		stdLog.IsNew = new(true)
+		stdLog.PlayedAt = playedAtJST
+		weLog := validPlayLogEntry()
+		weLog.Title = "World Song"
+		weLog.Diff = "WE"
+		weLog.Jacket = new("we-jacket")
+		weLog.Score = new(995000)
+		weLog.IsNew = new(true)
+		weLog.PlayedAt = playedAtJST
+		fx.payload.ScoreHistory = []PlayerDataPlayLogEntry{stdLog, weLog}
+
+		_, err := fx.uc.Register(context.Background(), fx.user, fx.payload, "play-log-is-new-insert")
+		require.NoError(t, err)
+		require.Len(t, fx.data.savedInput.FullRecordsToInsert, 1)
+		assert.Equal(t, playedAtUTC, fx.data.savedInput.FullRecordsToInsert[0].State.UpdatedAt)
+		require.Len(t, fx.data.savedInput.WorldsendRecordsToInsert, 1)
+		assert.Equal(t, playedAtUTC, fx.data.savedInput.WorldsendRecordsToInsert[0].State.UpdatedAt)
+	})
+
+	t.Run("既存レコード更新時は前回更新日時より新しい場合のみplayed_atを使う", func(t *testing.T) {
+		tests := []struct {
+			name            string
+			beforeUpdatedAt time.Time
+			expected        time.Time
+		}{
+			{
+				name:            "前回更新日時より新しいplayed_atは採用する",
+				beforeUpdatedAt: time.Date(2026, 9, 1, 9, 0, 0, 0, time.UTC),
+				expected:        playedAtUTC,
+			},
+			{
+				name:            "前回更新日時と同一のplayed_atは収集日時にフォールバックする",
+				beforeUpdatedAt: playedAtUTC,
+				expected:        collectedAt,
+			},
+			{
+				name:            "前回更新日時より古いplayed_atは収集日時にフォールバックする",
+				beforeUpdatedAt: time.Date(2026, 9, 1, 9, 42, 30, 0, time.UTC),
+				expected:        collectedAt,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				fx, _ := newFixtureWithCandidates(t)
+				fx.data.fullBefore = map[int]repository.PlayerRecordState{
+					101: {Score: 1000000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, SlotID: 2, SlotOrder: new(1), UpdatedAt: tt.beforeUpdatedAt},
+				}
+				fx.data.worldsendBefore = map[int]repository.WorldsendRecordState{
+					201: {Score: 990000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, UpdatedAt: tt.beforeUpdatedAt},
+				}
+				fx.payload.Scores.Standard = []PlayerDataScoreEntry{
+					{Idx: "full-song", Diff: "MASTER", Score: 1005000, Slot: new("best"), Order: new(1)},
+				}
+				fx.payload.Scores.Worldsend = []PlayerDataScoreEntry{
+					{Idx: "world-song", Diff: "WE", Score: 995000},
+				}
+				stdLog := validPlayLogEntry()
+				stdLog.Score = new(1005000)
+				stdLog.IsNew = new(true)
+				stdLog.PlayedAt = playedAtJST
+				weLog := validPlayLogEntry()
+				weLog.Title = "World Song"
+				weLog.Diff = "WE"
+				weLog.Jacket = new("we-jacket")
+				weLog.Score = new(995000)
+				weLog.IsNew = new(true)
+				weLog.PlayedAt = playedAtJST
+				fx.payload.ScoreHistory = []PlayerDataPlayLogEntry{stdLog, weLog}
+
+				_, err := fx.uc.Register(context.Background(), fx.user, fx.payload, "play-log-is-new-update")
+				require.NoError(t, err)
+				require.Len(t, fx.data.savedInput.FullRecordsToUpdate, 1)
+				assert.Equal(t, tt.expected, fx.data.savedInput.FullRecordsToUpdate[0].State.UpdatedAt)
+				require.Len(t, fx.data.savedInput.WorldsendRecordsToUpdate, 1)
+				assert.Equal(t, tt.expected, fx.data.savedInput.WorldsendRecordsToUpdate[0].State.UpdatedAt)
+			})
+		}
+	})
+
+	t.Run("成績変化のない既存レコードはis_newがあっても遡及更新しない", func(t *testing.T) {
+		fx, _ := newFixtureWithCandidates(t)
+		fx.data.fullBefore = map[int]repository.PlayerRecordState{
+			101: {Score: 1005000, ClearLampID: 1, ComboLampID: 1, FullChainID: 1, SlotID: 2, SlotOrder: new(1), UpdatedAt: time.Date(2026, 9, 1, 9, 50, 0, 0, time.UTC)},
+		}
+		fx.payload.Scores.Standard = []PlayerDataScoreEntry{
+			{Idx: "full-song", Diff: "MASTER", Score: 1005000, Slot: new("best"), Order: new(1)},
+		}
+		stdLog := validPlayLogEntry()
+		stdLog.Score = new(1005000)
+		stdLog.IsNew = new(true)
+		stdLog.PlayedAt = playedAtJST
+		fx.payload.ScoreHistory = []PlayerDataPlayLogEntry{stdLog}
+
+		_, err := fx.uc.Register(context.Background(), fx.user, fx.payload, "play-log-no-retroactive")
+		require.NoError(t, err)
+		assert.Empty(t, fx.data.savedInput.FullRecordsToInsert)
+		assert.Empty(t, fx.data.savedInput.FullRecordsToUpdate)
+	})
+
+	t.Run("フォールバック条件と複数履歴からの最新選択", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			logs     []PlayerDataPlayLogEntry
+			expected time.Time
+		}{
+			{
+				name: "is_newがfalseの場合は収集日時を使う",
+				logs: []PlayerDataPlayLogEntry{{
+					Title: "Full Song", Diff: "master", Jacket: new("jacket"),
+					Score: new(1005000), ClearLamp: new("clear"), ComboLv: new(2), FullChain: new(2),
+					IsNew: new(false), PlayedAt: playedAtJST,
+				}},
+				expected: collectedAt,
+			},
+			{
+				name: "スコアが一致しないis_newは使わない",
+				logs: []PlayerDataPlayLogEntry{{
+					Title: "Full Song", Diff: "master", Jacket: new("jacket"),
+					Score: new(1004000), ClearLamp: new("clear"), ComboLv: new(2), FullChain: new(2),
+					IsNew: new(true), PlayedAt: playedAtJST,
+				}},
+				expected: collectedAt,
+			},
+			{
+				name: "収集日時より未来のplayed_atは使わない",
+				logs: []PlayerDataPlayLogEntry{{
+					Title: "Full Song", Diff: "master", Jacket: new("jacket"),
+					Score: new(1005000), ClearLamp: new("clear"), ComboLv: new(2), FullChain: new(2),
+					IsNew: new(true), PlayedAt: "2026/09/01 19:01",
+				}},
+				expected: collectedAt,
+			},
+			{
+				name: "TIMESTAMP下限未満のplayed_atは使わない",
+				logs: []PlayerDataPlayLogEntry{{
+					Title: "Full Song", Diff: "master", Jacket: new("jacket"),
+					Score: new(1005000), ClearLamp: new("clear"), ComboLv: new(2), FullChain: new(2),
+					IsNew: new(true), PlayedAt: "1969/12/31 23:59",
+				}},
+				expected: collectedAt,
+			},
+			{
+				name: "同一譜面・同一スコアのis_newが複数ある場合は最新を選ぶ",
+				logs: []PlayerDataPlayLogEntry{
+					{
+						Title: "Full Song", Diff: "master", Jacket: new("jacket"),
+						Score: new(1005000), ClearLamp: new("clear"), ComboLv: new(2), FullChain: new(2),
+						IsNew: new(true), PlayedAt: "2026/09/01 18:10",
+					},
+					{
+						Title: "Full Song", Diff: "master", Jacket: new("jacket"),
+						Score: new(1005000), ClearLamp: new("clear"), ComboLv: new(2), FullChain: new(2),
+						IsNew: new(true), PlayedAt: playedAtJST,
+					},
+				},
+				expected: playedAtUTC,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				fx, _ := newFixtureWithCandidates(t)
+				fx.payload.Scores.Standard = []PlayerDataScoreEntry{
+					{Idx: "full-song", Diff: "MASTER", Score: 1005000, Slot: new("best"), Order: new(1)},
+				}
+				fx.payload.ScoreHistory = tt.logs
+
+				_, err := fx.uc.Register(context.Background(), fx.user, fx.payload, "play-log-fallback")
+				require.NoError(t, err)
+				require.Len(t, fx.data.savedInput.FullRecordsToInsert, 1)
+				assert.Equal(t, tt.expected, fx.data.savedInput.FullRecordsToInsert[0].State.UpdatedAt)
+			})
+		}
+	})
+
+	t.Run("TIMESTAMP上限超過のplayed_atは使わない", func(t *testing.T) {
+		futureCollectedAt := time.Date(2038, 1, 20, 0, 0, 0, 0, time.UTC)
+		fx, _ := newFixtureWithCandidates(t)
+		fx.payload.UpdatedAt = futureCollectedAt.Format(time.RFC3339)
+		fx.payload.Scores.Standard = []PlayerDataScoreEntry{
+			{Idx: "full-song", Diff: "MASTER", Score: 1005000, Slot: new("best"), Order: new(1)},
+		}
+		log := validPlayLogEntry()
+		log.Score = new(1005000)
+		log.IsNew = new(true)
+		log.PlayedAt = "2038/01/19 12:15"
+		fx.payload.ScoreHistory = []PlayerDataPlayLogEntry{log}
+
+		_, err := fx.uc.Register(context.Background(), fx.user, fx.payload, "play-log-timestamp-upper-bound")
+		require.NoError(t, err)
+		require.Len(t, fx.data.savedInput.FullRecordsToInsert, 1)
+		assert.Equal(t, futureCollectedAt, fx.data.savedInput.FullRecordsToInsert[0].State.UpdatedAt)
+	})
+}
+
 type playLogRegistrationRepository struct {
 	*registrationDataRepository
 	candidates []entity.PlayLogChartCandidate

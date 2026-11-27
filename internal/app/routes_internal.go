@@ -65,6 +65,8 @@ func registerInternalRoutes(
 	}
 
 	internal.GET("/system/status", handlers.SystemMaintenance.Status, echoMiddleware.CORSWithConfig(newExternalCORSConfig(cfg)))
+	// 表示はフロントでログイン時に限るため、認証済み参照系として共有の制限枠を適用します。
+	internal.GET("/app-announcements", handlers.AppAnnouncement.List, mw.firebaseAuthReadOptimized, mw.authenticatedReadRateLimit)
 
 	registerInternalAuthRoutes(internal, handlers, mw)
 	registerInternalMeRoutes(internal, handlers, mw, cfg)
@@ -234,6 +236,10 @@ func registerInternalAdminRoutes(internal *echo.Group, handlers *Handlers, mw in
 	adminGroup.GET("/chart-rankings/worldsend-songs/:id", handlers.AdminChartRanking.GetWorldsend)
 	adminGroup.GET("/course-rankings/:id", handlers.CourseRanking.GetAdmin)
 	adminGroup.PUT("/maintenance", handlers.SystemMaintenance.Update)
+	adminGroup.GET("/app-announcements", handlers.AdminAppAnnouncement.List)
+	adminGroup.POST("/app-announcements", handlers.AdminAppAnnouncement.Create)
+	adminGroup.PUT("/app-announcements/:id", handlers.AdminAppAnnouncement.Update)
+	adminGroup.DELETE("/app-announcements/:id", handlers.AdminAppAnnouncement.Delete)
 	adminGroup.GET("/versions", handlers.Version.List)
 	adminGroup.POST("/versions", handlers.Version.Create)
 	adminGroup.PUT("/versions/:id", handlers.Version.Rename)

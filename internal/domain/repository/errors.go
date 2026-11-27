@@ -39,6 +39,9 @@ var (
 	// ErrHonorConflict は称号の一意制約または参照制約により操作できない場合に返されるエラーです。
 	ErrHonorConflict = errors.New("honor conflict")
 
+	// ErrAppAnnouncementNotFound はお知らせが見つからなかった場合に返されるエラーです。
+	ErrAppAnnouncementNotFound = errors.New("app announcement not found")
+
 	// ErrVersionNotFound はバージョンが見つからなかった場合に返されるエラーです。
 	ErrVersionNotFound = errors.New("version not found")
 

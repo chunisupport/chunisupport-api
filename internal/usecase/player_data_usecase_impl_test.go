@@ -371,6 +371,28 @@ func TestValidateScoreEntry_FullChainはAJまたはFCが必要(t *testing.T) {
 	}
 }
 
+func TestValidateScoreEntry_虹FULLCHAINはAJが必要(t *testing.T) {
+	for _, tt := range []struct {
+		name      string
+		combo     *int
+		wantError bool
+	}{
+		{name: "AJなら受理する", combo: new(3)},
+		{name: "FCなら拒否する", combo: new(2), wantError: true},
+		{name: "コンボランプ省略を拒否する", wantError: true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			entry := PlayerDataScoreEntry{Idx: "full-song", Score: 1009000, ComboLv: tt.combo, FullChain: new(4)}
+			err := validateScoreEntry(&entry, "standard", 0)
+			if tt.wantError {
+				assert.ErrorContains(t, err, "without AJ")
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestResolveClassEmblemIDs(t *testing.T) {
 	tests := []struct {
 		name        string

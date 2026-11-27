@@ -118,6 +118,7 @@ func TestEncodeDecodeThresholds(t *testing.T) {
 			{name: "先頭のmin_scoreが0でない", data: []byte{1, 1, 0, 0, 0, 10, 0}},
 			{name: "bpが0で範囲外", data: []byte{1, 0, 0, 0, 0, 0, 0}},
 			{name: "bpが10001で範囲外", data: []byte{1, 0, 0, 0, 0, 0x11, 0x27}},
+			{name: "境界が10,001件で上限超過", data: encodeIncreasingThresholds(10001)},
 		}
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
@@ -126,4 +127,19 @@ func TestEncodeDecodeThresholds(t *testing.T) {
 			})
 		}
 	})
+
+	t.Run("境界が上限の10,000件ちょうどなら復元できる", func(t *testing.T) {
+		decoded, err := DecodeThresholds(encodeIncreasingThresholds(10000))
+		require.NoError(t, err)
+		assert.Len(t, decoded, 10000)
+	})
+}
+
+// encodeIncreasingThresholds は min_score が0から1ずつ増える、形式上は妥当な境界列を count 件エンコードします。
+func encodeIncreasingThresholds(count int) []byte {
+	thresholds := make([]Threshold, count)
+	for i := range thresholds {
+		thresholds[i] = Threshold{MinScore: uint32(i), TopPercentBP: maxTopPercentBP} // #nosec G115 -- テストで指定する件数は非負
+	}
+	return EncodeThresholds(thresholds)
 }

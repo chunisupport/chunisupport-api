@@ -1041,6 +1041,7 @@ func TestGoalUsecase_CreateFullChainCount(t *testing.T) {
 	}{
 		{name: "GOLDとcountを受理する", params: []byte(`{"lamp":"GOLD","count":1}`)},
 		{name: "PLATINUMとremainingを受理する", params: []byte(`{"lamp":"PLATINUM","remaining":1}`)},
+		{name: "RAINBOWとcountを受理する", params: []byte(`{"lamp":"RAINBOW","count":1}`)},
 		{name: "count省略を受理する", params: []byte(`{"lamp":"GOLD"}`)},
 		{name: "countのnullを受理する", params: []byte(`{"lamp":"GOLD","count":null}`)},
 		{name: "percentを受理する", params: []byte(`{"lamp":"PLATINUM","percent":50.5}`)},

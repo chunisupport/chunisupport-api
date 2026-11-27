@@ -54,7 +54,7 @@
 - `/internal/player-data/temp`: **1分あたり30回/IP**
 - `/internal/player-data/commit`: **30秒あたり1回/ユーザー**
 - `/internal/users/*`、`/internal/songs/*`、`/internal/worldsend-songs/*`、`/internal/courses` の公開参照系、および `/internal/best-slot-rankings`（Firebase Bearer任意）: **未認証時のみ1分あたり60回/IP**
-- 内部APIの認証済み参照系（`GET /internal/me/*`、`/internal/friends/*`、`/internal/friend-rankings/*`、`/internal/friend-comparisons/*`、および上記の公開参照系を認証済みで呼んだ場合）: **全エンドポイント合計で1分あたり300回/ユーザー**
+- 内部APIの認証済み参照系（`GET /internal/me/*`、`GET /internal/app-announcements`、`/internal/friends/*`、`/internal/friend-rankings/*`、`/internal/friend-comparisons/*`、および上記の公開参照系を認証済みで呼んだ場合）: **全エンドポイント合計で1分あたり300回/ユーザー**
 - `/v1/*`: **15分あたり150回（PLAYER） / 3,000回（EDITOR/EXTDEV） / 150,000回（ADMIN）**
 - `/compat/chunirec/2.0/*`: **`/v1` と同一**
 - `/compat/reiwa/1/*`: **`/v1` と同一**
@@ -249,6 +249,7 @@ Content-Type: application/json
 | `/badges/users/:username/overpower-percent` | GET | 不要 | Shields.io向けの公式OVER POWER割合バッジ情報 |
 | `/version` | GET | APIトークン(ADMIN) | APIのバージョン識別子取得（`read` / `read_write`いずれも可） |
 | `/internal/system/status` | GET | 不要 | APIの運用状態とメンテナンスコメントを取得 |
+| `/internal/app-announcements` | GET | Firebase Bearer | 配信中の期間限定のお知らせを取得 |
 | `/internal/auth/login` | POST | Firebase Bearer + Turnstile | Firebase IDトークンとTurnstileでログイン検証 |
 | `/internal/auth/signup` | POST | Firebase Bearer + Turnstile | Firebase IDトークンで初回ユーザー登録 |
 | `/internal/auth/api-tokens` | GET | Firebase Bearer | APIトークン一覧取得 |
@@ -263,6 +264,8 @@ Content-Type: application/json
 | `/internal/admin/chart-rankings/worldsend-songs/:id` | GET | Firebase Bearer (ADMIN+) | WORLD'S END譜面の全ユーザーランキング上位100件取得 |
 | `/internal/admin/course-rankings/:id` | GET | Firebase Bearer (ADMIN+) | コースの全ユーザーランキング上位100件取得 |
 | `/internal/admin/maintenance` | PUT | Firebase Bearer (ADMIN+) | メンテナンス状態を開始・終了 |
+| `/internal/admin/app-announcements` | GET / POST | Firebase Bearer (ADMIN+) | お知らせの全件一覧・追加 |
+| `/internal/admin/app-announcements/:id` | PUT / DELETE | Firebase Bearer (ADMIN+) | お知らせの更新・削除 |
 | `/internal/admin/song-batch/jobs` | GET / POST | Firebase Bearer (ADMIN+) | 楽曲バッチの実行履歴取得・実行 |
 | `/internal/admin/song-batch/jobs/:id` | GET | Firebase Bearer (ADMIN+) | 楽曲バッチジョブの状態取得 |
 | `/internal/admin/chart-stats-batch/jobs` | GET / POST | Firebase Bearer (ADMIN+) | 譜面統計バッチの実行履歴取得・実行 |
@@ -574,7 +577,91 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 
 ---
 
+## お知らせエンドポイント
+
+### GET `/internal/app-announcements`
+
+- **認証**: Firebase Bearer（必須）
+- **概要**: プロフィールカード上部とお知らせ一覧ページに表示する、配信中の期間限定のお知らせを取得します。Docsの記事配信とは独立しています。
+- **配信条件**: APIサーバー時刻を基準に `starts_at <= 現在 < expires_at` のものだけを返します。終了済みのものは返しません。
+- **並び順**: `starts_at` の新しい順。同時刻は `id` の降順です。
+- **レスポンスヘッダー**: `Cache-Control: no-store`（配信開始・終了・緊急停止を即時に反映するため）
+- 閉じた状態・既読はAPIで保持しません。フロントエンドが `id` と `revision` を使って管理します。
+- 登録は管理者向けの `/internal/admin/app-announcements` で行います。SQLでの登録手順は `docs/app_announcements.md` を参照してください。
+
+```json
+{
+  "announcements": [
+    {
+      "id": "3f2a9c1d5b7e8a04",
+      "kind": "link",
+      "title": "大型アップデートのお知らせ",
+      "body": null,
+      "target_url": "https://docs.chunisupport.net/announcements/2026-12-01/",
+      "starts_at": "2026-12-01T00:00:00+09:00",
+      "expires_at": "2026-12-15T00:00:00+09:00",
+      "revision": 1
+    },
+    {
+      "id": "8c0d4e6f1a2b3c4d",
+      "kind": "message",
+      "title": "メンテナンスのお知らせ",
+      "body": "12月10日 2:00〜4:00 にメンテナンスを行います。\nこの間はデータ登録ができません。",
+      "target_url": null,
+      "starts_at": "2026-11-30T12:00:00+09:00",
+      "expires_at": "2026-12-10T04:00:00+09:00",
+      "revision": 2
+    }
+  ]
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `id` | string | お知らせの固有ID（16桁の16進数） |
+| `kind` | string | 選択したときの動作。`message`（選ぶとダイアログで `title` と `body` を表示）または `link`（バナー自体がリンクで、選ぶと `target_url` へ遷移）。今後増える可能性があるため、未知の値は表示しないでください |
+| `title` | string | プロフィールカード上部・一覧に表示する文言 |
+| `body` | string \| null | `message` でダイアログに `title` と共に表示する本文。プレーンテキスト（改行を保持）で、`[リンクテキスト](URL)` の記述だけはフロントエンドがリンクとして表示する。APIは記述を解釈・検証しない。`link` では `null` |
+| `target_url` | string \| null | `link` の遷移先。`/` で始まればアプリ内パス、それ以外は外部URL。リンク先の内容はAPIで検証しません。`message` では `null` |
+| `starts_at` | string | 表示開始日時（RFC3339） |
+| `expires_at` | string | 表示終了日時（RFC3339、この時刻を含まない） |
+| `revision` | integer | 閉じた利用者にも再表示させたいときに増やす整数（1以上） |
+
+配信中のお知らせがない場合は `{"announcements": []}` を返します。不正な登録データ（未知の種別、種別と項目の不整合など）がある場合は登録ミスに気付けるよう 500 を返します。
+
 ## 管理者向け情報エンドポイント
+
+### お知らせ管理 `/internal/admin/app-announcements`
+
+- **認証**: Firebase Bearer（ADMINのみ）
+- **GET**: 終了済み・開始前を含む全件を `GET /internal/app-announcements` と同じ形式（`{"announcements": [...]}`）で返します。並び順は `starts_at` の新しい順、同時刻は `id` の降順です。
+- **POST**: お知らせを追加し、201 Created で作成したお知らせを返します。`id` はサーバーが採番し、`revision` は 1 です。
+
+```json
+{
+  "kind": "message",
+  "title": "メンテナンスのお知らせ",
+  "body": "12月10日 2:00〜4:00 にメンテナンスを行います。",
+  "target_url": null,
+  "starts_at": "2026-11-30T12:00:00+09:00",
+  "expires_at": "2026-12-10T04:00:00+09:00"
+}
+```
+
+| フィールド | 型 | 説明 |
+| ---------- | -- | ---- |
+| `kind` | string | `message` または `link` |
+| `title` | string | 必須。200文字以内 |
+| `body` | string \| null | `message` で必須（空白だけは不可、65,535バイト以内）。`link` では `null` |
+| `target_url` | string \| null | `link` で必須（2048文字以内）。`/` 始まりのアプリ内パス（`//` やバックスラッシュ・空白を含むものは不可）か、`http(s)://` のURL。`message` では `null` |
+| `starts_at` / `expires_at` | string | 必須。RFC3339。秒未満は切り捨て、切り捨て後に `starts_at < expires_at`。UTCで保存し、UTCで返します |
+
+### お知らせ更新・削除 `/internal/admin/app-announcements/:id`
+
+- **認証**: Firebase Bearer（ADMINのみ）
+- **PUT**: 追加時と同じ項目に `bump_revision`（boolean）を加えて全項目を上書きし、更新後のお知らせを返します。`bump_revision` が `true` の場合は `revision` を1つ増やし、閉じた利用者にも再表示させます（上限255）。
+- **DELETE**: お知らせを削除し、204 No Content を返します。配信中のものは即時に停止します。
+- **エラー**: 入力が不正な場合は 422 `validation_failed`、JSON形式や未知のフィールドは 400 `validation_failed`、存在しない（形式不正を含む）`id` は 404 `not_found` です。
 
 ### バージョン管理 `/internal/admin/versions`
 
@@ -2137,13 +2224,15 @@ curl -X POST \
 | `diff` | string | ✓ | `BASIC`、`ADVANCED`、`EXPERT`、`MASTER`、`ULTIMA`、`WORLD'S END`。通常譜面は登録済みスコアと同じ略記も可。WORLD'S END は `WE`、`WORLDSEND` も可。大文字小文字を区別しない |
 | `jacket_img_id` | string \| null | | 拡張子を除いたジャケット画像名。20文字まで |
 | `score` | integer | ✓ | 0〜1,010,000 |
-| `is_new` | boolean | ✓ | NEW RECORD が表示されたか。プレイ履歴への保存対象外 |
+| `is_new` | boolean | ✓ | NEW RECORD が表示されたか。プレイ履歴には保存しないが、新規または成績更新された通常譜面・WORLD'S END譜面の `updated_at` に一致する `played_at` を反映する判定に使用 |
 | `played_at` | string | ✓ | 日本時間の `YYYY/MM/DD HH:mm`。保存時にUTCに変換 |
 | `clear_lamp` | string \| null | | 既存スコアと同じクリアランプ。`null` または省略は `FAILED` |
 | `cmb_lv` | integer | ✓ | 1: なし、2: FULL COMBO、3: ALL JUSTICE |
-| `fch_lv` | integer | ✓ | 1: なし、2: FULL CHAIN PLATINUM、3: FULL CHAIN GOLD |
+| `fch_lv` | integer | ✓ | 1: なし、2: FULL CHAIN PLATINUM、3: FULL CHAIN GOLD、4: FULL CHAIN RAINBOW（`cmb_lv=3` が必須） |
 
 受信順で履歴全体を置き換えます。同一日時・同一本文の再送では保存済みの履歴を維持します。ジャケット画像IDと難易度で譜面を照合し、同じ画像を使う譜面が複数ある場合は曲名も確認します。譜面を一意に特定できない場合も、再照合用のジャケット画像IDと難易度を含むプレイ履歴を保存します。
+
+通常譜面または WORLD'S END 譜面が新規登録または成績更新される際、同じ譜面に一意に照合できた `is_new: true` かつスコア一致の履歴があり、その `played_at` が `TIMESTAMP` の有効範囲内かつリクエストの `updated_at` 以下（既存レコード更新時は前回 `updated_at` より新しい場合）であれば、その最新の `played_at` をレコードの `updated_at` に採用します。条件を満たさない場合は従来どおりリクエストの `updated_at` を使用します。成績変化のない既存レコードの `updated_at` は更新しません。
 
 `score_history` の欠落、`null`、空配列、51件以上、または不正な項目を含む配列は `422 validation_failed` となります。履歴の保存に失敗したときはスコアを含めて登録全体をロールバックします。直近のプレイ履歴はユーザーデータ移行の対象外です。
 
@@ -2166,7 +2255,7 @@ curl -X POST \
 | `score` | number | ✓ | スコア (0〜1,010,000) |
 | `clear_lamp` | string \| null | | クリアランプ (`clear`, `hard`, `brave`, `absolute`, `catastrophy`, `null`=FAILED) |
 | `cmb_lv` | number \| null | | コンボランプ (1=NONE, 2=FULL COMBO, 3=ALL JUSTICE) |
-| `fch_lv` | number \| null | | フルチェイン（後方互換のため **1=NONE, 2=PLATINUM, 3=GOLD** として解釈） |
+| `fch_lv` | number \| null | | フルチェイン（**1=NONE, 2=PLATINUM, 3=GOLD, 4=RAINBOW**。4の場合は `cmb_lv=3` が必須） |
 | `slot` | string \| null | | スロット (`best`, `best_candidate`, `new`, `new_candidate`, `null`=none) |
 | `order` | number \| null | | スロット内順序 |
 
@@ -2572,7 +2661,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 | `avg_score` | 全譜面の平均スコア |
 | `hardlamp_count` | 指定ハードランプの達成数 |
 | `combolamp_count` | 指定コンボランプの達成数 |
-| `fullchain_count` | 指定FULL CHAIN種別の達成数 |
+| `fullchain_count` | 指定したFULL CHAINランプ以上の達成譜面数 |
 | `rainbow_count` | BASIC〜MASTERと、存在する場合はULTIMAがすべてALL JUSTICEの楽曲数 |
 | `total_score` | 全譜面のスコア合計 |
 | `overpower_value` | 全譜面のOverPower値合計 |
@@ -2694,7 +2783,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 
 | パラメータ | 型 | 範囲 | 説明 |
 |---|---|---|---|
-| `lamp` | `string` | `GOLD` または `PLATINUM`（完全一致） | FULL CHAIN種別 |
+| `lamp` | `string` | `GOLD`、`PLATINUM`、`RAINBOW`（完全一致） | FULL CHAIN種別 |
 | `count` | `integer \| null` | null または 1〜対象譜面数 | 目標件数。省略/null時は「対象譜面数（動的上限）」として扱います |
 | `remaining` | `integer \| null` | null または 0〜対象譜面数 | 動的上限から差し引く残数 |
 | `percent` | `number \| null` | null または 0〜100 | 動的上限に対する目標割合 |
@@ -2705,8 +2794,9 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
 |---|---|
 | `GOLD` | `FULL CHAIN GOLD` |
 | `PLATINUM` | `FULL CHAIN PLATINUM` |
+| `RAINBOW` | `FULL CHAIN RAINBOW` |
 
-指定したFULL CHAIN種別と完全一致する譜面を達成数として扱います。
+達成数は指定したランプ以上を数えます。GOLDは金・鉑・虹、PLATINUMは鉑・虹、RAINBOWは虹が対象です。
 
 #### `rainbow_count`
 
@@ -5215,7 +5305,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "full_chains": [
     { "id": 1, "name": "NONE" },
     { "id": 2, "name": "FULL CHAIN GOLD" },
-    { "id": 3, "name": "FULL CHAIN PLATINUM" }
+    { "id": 3, "name": "FULL CHAIN PLATINUM" },
+    { "id": 4, "name": "FULL CHAIN RAINBOW" }
   ],
   "slots": [
     { "id": 1, "name": "none" },
