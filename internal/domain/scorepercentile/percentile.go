@@ -49,7 +49,7 @@ func BuildThresholds(scores []int) []Threshold {
 	sorted := make([]uint32, total)
 	for i, s := range scores {
 		if s > 0 {
-			sorted[i] = uint32(s)
+			sorted[i] = uint32(s) // #nosec G115 -- スコアは0～1,010,000で、正の値だけを変換するためuint32の範囲内
 		}
 	}
 	slices.Sort(sorted)
@@ -83,8 +83,9 @@ func BuildThresholds(scores []int) []Threshold {
 // calcTopPercentBP は (higher + 1) / total * 100 を小数点以下2桁に四捨五入したベーシスポイント（1〜10000）を返します。
 // 整数演算だけで計算することで、浮動小数点の丸め誤差を排除します。
 func calcTopPercentBP(higher, total int) uint16 {
-	numerator := uint64(higher+1)*uint64(maxTopPercentBP) + uint64(total)/2
-	raw := numerator / uint64(total)
+	// 呼び出し元は 0 <= higher < total を保証するため、負の値をuint64へ変換することはない。
+	numerator := uint64(higher+1)*uint64(maxTopPercentBP) + uint64(total)/2 // #nosec G115 -- higherとtotalは非負
+	raw := numerator / uint64(total)                                        // #nosec G115 -- totalは正
 	if raw < uint64(minTopPercentBP) {
 		return minTopPercentBP
 	}
@@ -121,6 +122,10 @@ func DecodeThresholds(data []byte) ([]Threshold, error) {
 	}
 
 	count := payloadLen / thresholdEntryBytes
+	// 境界は上位%の値ごとに1件のため最大10,000件。超える場合は破損データとして扱い、逆引き表の件数をuint16に収める。
+	if count > int(maxTopPercentBP) {
+		return nil, fmt.Errorf("%w: too many thresholds (%d)", ErrInvalidThresholdData, count)
+	}
 	thresholds := make([]Threshold, count)
 	offset := 1
 	for i := range count {
@@ -168,14 +173,14 @@ func buildLookupTable(entries []Entry) lookupTable {
 		if len(e.Thresholds) == 0 {
 			continue
 		}
-		offset := uint32(len(t.minScores))
+		offset := uint32(len(t.minScores)) // #nosec G115 -- 1件あたり最大10,000件で、全譜面・コース分でもuint32の範囲内
 		for _, th := range e.Thresholds {
 			t.minScores = append(t.minScores, th.MinScore)
 			t.bps = append(t.bps, th.TopPercentBP)
 		}
 		t.index[e.TargetID] = rangeRef{
 			offset: offset,
-			length: uint16(len(e.Thresholds)),
+			length: uint16(len(e.Thresholds)), // #nosec G115 -- BuildThresholdsとDecodeThresholdsが最大10,000件を保証する
 		}
 	}
 	return t
