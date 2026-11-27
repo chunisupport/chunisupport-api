@@ -14,15 +14,13 @@ import (
 )
 
 func TestTransferGoalAttributesRoundTrip(t *testing.T) {
-	masters := &transferMasterData{
-		difficultyIDs:   map[string]int{"MASTER": 4},
-		difficultyNames: map[int]string{4: "MASTER"},
-		genreIDs:        map[string]int{"POPS&ANIME": 2},
-		genreNames:      map[int]string{2: "POPS&ANIME"},
-		versionIDs:      map[string]int{"VERSE": 7},
-		versionNames:    map[int]string{7: "VERSE"},
-	}
-	internal := json.RawMessage("{\"diff\":4,\"genre\":[2],\"ver\":7,\"const\":{\"min\":14.0,\"max\":15.0}}")
+	masters := newTransferGoalAttributeMastersForTest(
+		map[string]string{"MASTER": "MASTER"},
+		map[string]string{"POPS&ANIME": "POPS&ANIME"},
+		map[string]string{"0000000000000007": "VERSE"},
+	)
+	// 難易度・ジャンルはマスタ名、バージョンは公開IDで保存されている。
+	internal := json.RawMessage("{\"diff\":\"MASTER\",\"genre\":[\"POPS&ANIME\"],\"ver\":\"0000000000000007\",\"const\":{\"min\":14.0,\"max\":15.0}}")
 
 	external, err := masters.externalizeGoalAttributes(internal)
 	require.NoError(t, err)
@@ -57,8 +55,7 @@ func TestFindTransferUnresolvedReferencesCollectsAndSorts(t *testing.T) {
 		songIDs: map[string]int{}, charts: map[string]transferChartMaster{}, worldsendChartIDs: map[string]int{}, courseIDs: map[string]int{},
 		clearLampIDs: map[string]int{"NONE": 1}, comboLampIDs: map[string]int{"NONE": 1}, fullChainIDs: map[string]int{"NONE": 1}, slotIDs: map[string]int{"none": 1},
 		classEmblemIDs: map[string]int{}, classEmblemBaseIDs: map[string]int{}, possessionIDs: map[string]int{entity.PossessionNameNormal: entity.DefaultPossessionID}, honorTypeIDs: map[string]int{}, honorIDsByImage: map[string]int{}, honorIDsByNameAndType: map[string]int{},
-		achievementTypeIDs: map[string]int{}, difficultyIDs: map[string]int{"MASTER": 4}, difficultyNames: map[int]string{4: "MASTER"},
-		genreIDs: map[string]int{}, genreNames: map[int]string{}, versionIDs: map[string]int{}, versionNames: map[int]string{},
+		achievementTypeIDs: map[string]int{},
 	}
 
 	got := findTransferUnresolvedReferences(snapshot, masters)
@@ -169,11 +166,8 @@ func TestCalculateTransferDerivedMetrics_通常譜面未解禁の楽曲はULTIMA
 
 func TestTransferGoalAttributesKeepsConstFilterMode(t *testing.T) {
 	// Given: 譜面定数の入力モードを持つ目標属性
-	masters := &transferMasterData{
-		difficultyIDs:   map[string]int{"MASTER": 4},
-		difficultyNames: map[int]string{4: "MASTER"},
-	}
-	internal := json.RawMessage(`{"diff":4,"const":{"min":14.0,"max":14.9},"const_filter_mode":"level"}`)
+	masters := newTransferGoalAttributeMastersForTest(map[string]string{"MASTER": "MASTER"}, nil, nil)
+	internal := json.RawMessage(`{"diff":"MASTER","const":{"min":14.0,"max":14.9},"const_filter_mode":"level"}`)
 
 	// When: 移行ファイル形式へ変換して戻す
 	external, err := masters.externalizeGoalAttributes(internal)
@@ -184,4 +178,21 @@ func TestTransferGoalAttributesKeepsConstFilterMode(t *testing.T) {
 	// Then: 入力モードは変換せずに維持される
 	assert.JSONEq(t, `{"diff":"MASTER","const":{"min":14.0,"max":14.9},"const_filter_mode":"level"}`, string(external))
 	assert.JSONEq(t, string(internal), string(restored))
+}
+
+// newTransferGoalAttributeMastersForTest は保存値→マスタ名の対応から、目標属性の変換に使うマスタを組み立てます。
+func newTransferGoalAttributeMastersForTest(difficulties, genres, versions map[string]string) *transferMasterData {
+	masters := &transferMasterData{
+		goalAttributeNames:        map[string]map[string]string{},
+		goalAttributeStoredValues: map[string]map[string]string{},
+	}
+	for key, names := range map[string]map[string]string{"diff": difficulties, "genre": genres, "ver": versions} {
+		storedValues := make(map[string]string, len(names))
+		for storedValue, name := range names {
+			storedValues[name] = storedValue
+		}
+		masters.goalAttributeNames[key] = names
+		masters.goalAttributeStoredValues[key] = storedValues
+	}
+	return masters
 }

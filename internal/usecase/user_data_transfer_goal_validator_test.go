@@ -10,26 +10,28 @@ import (
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/goalgroupname"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestInternalizeTransferredGoalAttributes(t *testing.T) {
 	masters := &domainmasterdata.GoalMasters{
-		DifficultyNamesByID: map[int]string{4: "MASTER"},
-		GenreNamesByID:      map[int]string{2: "POPS&ANIME"},
-		VersionsByID:        map[int]domainmasterdata.Version{7: {ID: 7, Name: "VERSE", ReleasedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}},
+		Difficulties:        map[string]master.ChartDifficulty{"MASTER": {ID: 4, Name: "MASTER", SortOrder: 3}},
+		Genres:              map[string]master.Genre{"POPS&ANIME": {ID: 2, Name: "POPS&ANIME"}},
+		VersionsByDisplayID: map[string]domainmasterdata.Version{"0000000000000007": {ID: 7, DisplayID: "0000000000000007", Name: "VERSE", ReleasedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}},
 	}
 
 	got, err := internalizeTransferredGoalAttributes(json.RawMessage("{\"diff\":\"MASTER\",\"genre\":[\"POPS&ANIME\"],\"ver\":\"VERSE\"}"), masters)
 
+	// 難易度・ジャンルはマスタ名のまま、バージョンは公開IDとして保存形式になる。
 	require.NoError(t, err)
-	assert.JSONEq(t, "{\"diff\":4,\"genre\":[2],\"ver\":7}", string(got))
+	assert.JSONEq(t, "{\"diff\":\"MASTER\",\"genre\":[\"POPS&ANIME\"],\"ver\":\"0000000000000007\"}", string(got))
 }
 
 func TestInternalizeTransferredGoalAttributesRejectsInternalIDs(t *testing.T) {
 	// Given: 難易度をマスタ名ではなく内部IDで指定している
-	masters := &domainmasterdata.GoalMasters{DifficultyNamesByID: map[int]string{4: "MASTER"}}
+	masters := &domainmasterdata.GoalMasters{Difficulties: map[string]master.ChartDifficulty{"MASTER": {ID: 4, Name: "MASTER"}}}
 
 	// When: 移行用の属性を内部IDへ戻す
 	_, err := internalizeTransferredGoalAttributes(json.RawMessage("{\"diff\":4}"), masters)

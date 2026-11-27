@@ -13,7 +13,7 @@ import (
 func itemsToDTOs(items []masterdata.Item) []*dto.MasterItemDTO {
 	dtos := make([]*dto.MasterItemDTO, len(items))
 	for i, item := range items {
-		dtos[i] = &dto.MasterItemDTO{ID: item.ID, Name: item.Name}
+		dtos[i] = &dto.MasterItemDTO{Name: item.Name}
 	}
 	return dtos
 }
@@ -38,7 +38,6 @@ func (h *MasterDataHandler) GetMasterData(c *echo.Context) error {
 	ratingBands := make([]*dto.RatingBandDTO, len(out.RatingBands))
 	for i, band := range out.RatingBands {
 		ratingBands[i] = &dto.RatingBandDTO{
-			ID:           band.ID,
 			Label:        band.Label,
 			MinInclusive: band.MinInclusive,
 			MaxExclusive: band.MaxExclusive,

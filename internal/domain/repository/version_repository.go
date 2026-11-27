@@ -5,13 +5,14 @@ import (
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 )
 
 // VersionRepository はバージョン集約の永続化を扱います。
 type VersionRepository interface {
 	FindAll(ctx context.Context, exec Executor) ([]*entity.Version, error)
-	FindByID(ctx context.Context, exec Executor, id int) (*entity.Version, error)
-	FindByIDForUpdate(ctx context.Context, exec Executor, id int) (*entity.Version, error)
+	FindByDisplayID(ctx context.Context, exec Executor, displayID displayid.DisplayID) (*entity.Version, error)
+	FindByDisplayIDForUpdate(ctx context.Context, exec Executor, displayID displayid.DisplayID) (*entity.Version, error)
 	FindByName(ctx context.Context, exec Executor, name string) (*entity.Version, error)
 	FindLatest(ctx context.Context, exec Executor) (*entity.Version, error)
 	ExistsSongInRange(ctx context.Context, exec Executor, from time.Time, to *time.Time) (bool, error)

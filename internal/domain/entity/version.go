@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 	"unicode/utf8"
+
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 )
 
 const (
@@ -18,15 +20,21 @@ var ErrInvalidVersion = errors.New("invalid version")
 
 // Version はCHUNITHMの稼働バージョンを表します。
 type Version struct {
-	ID   int
-	Name string
+	// ID はDB内部の参照専用で、APIには公開しません。
+	ID int
+	// DisplayID はAPI上の id として公開する識別子です。
+	DisplayID displayid.DisplayID
+	Name      string
 	// ShortName は一覧などで表示幅を最小限にするための超ショート名です（例: CRY+）。
 	ShortName  string
 	ReleasedAt time.Time
 }
 
 // NewVersion は保存可能なバージョンを生成します。
-func NewVersion(name, shortName string, releasedAt time.Time) (*Version, error) {
+func NewVersion(displayID displayid.DisplayID, name, shortName string, releasedAt time.Time) (*Version, error) {
+	if !displayID.IsValid() {
+		return nil, ErrInvalidVersion
+	}
 	trimmedName := strings.TrimSpace(name)
 	if err := validateVersionName(trimmedName); err != nil {
 		return nil, err
@@ -40,6 +48,7 @@ func NewVersion(name, shortName string, releasedAt time.Time) (*Version, error) 
 	}
 
 	return &Version{
+		DisplayID:  displayID,
 		Name:       trimmedName,
 		ShortName:  trimmedShortName,
 		ReleasedAt: normalizeVersionDate(releasedAt),

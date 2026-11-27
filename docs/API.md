@@ -579,7 +579,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 ### バージョン管理 `/internal/admin/versions`
 
 - **認証**: Firebase Bearer（ADMINのみ）
-- **GET**: 未来版を含む全件を `released_at` 昇順、同日はID昇順で返します。レスポンスは管理者向け `VersionDTO` の配列です。
+- **GET**: 未来版を含む全件を `released_at` 昇順で返します。レスポンスは管理者向け `VersionDTO` の配列です。
 - **POST**: バージョンを追加し、201 Createdで作成した管理者向け `VersionDTO` を返します。未来日を指定できます。
 
 ```json
@@ -596,7 +596,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `id` | int | バージョンID |
+| `id` | string | バージョンの公開ID（16文字の小文字16進数）。作成時にサーバーが採番し、DBの数値IDとは独立している |
 | `name` | string | バージョン名称 |
 | `short_name` | string | 超ショート名 |
 | `released_at` | string | リリース日（`YYYY-MM-DD`） |
@@ -604,10 +604,11 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 ### バージョン改名・削除 `/internal/admin/versions/:id`
 
 - **認証**: Firebase Bearer（ADMINのみ）
+- **パスパラメータ**: `id` - 管理者向け `VersionDTO` の `id`（公開ID）。DBの数値IDは受け付けません。
 - **PUT**: `{"name":"CHUNITHM VERSE","short_name":"VRS"}` の形式で名前と超ショート名を変更し、200 OKで変更後の管理者向け `VersionDTO` を返します。`name`・`short_name` とも必須で、制約は作成時と同じです。`released_at` を含む要求は拒否します。
 - **DELETE**: 対象が最新版で、そのリリース日以降にリリースされた曲が1件もない場合だけ物理削除し、204 No Contentを返します。`songs.is_deleted` にかかわらず曲ありと判定し、`songs.released_at IS NULL` は対象外です。
 
-主なエラーは `validation_failed`（400、JSONまたはID形式不正）、`invalid_version_input`（422）、`version_not_found`（404）、`version_name_conflict`・`version_not_latest`・`version_in_use`（409）です。
+主なエラーは `validation_failed`（400、JSONまたはID形式不正。16文字の小文字16進数でないIDを含む）、`invalid_version_input`（422）、`version_not_found`（404）、`version_name_conflict`・`version_not_latest`・`version_in_use`（409）です。
 
 `released_at` を誤登録した場合は、対象区間の曲を既存の楽曲更新APIで正しい日付範囲へ移し、最新版が曲なしになってから削除し、正しい日付で作成し直してください。中間版は削除できません。
 
@@ -2516,7 +2517,7 @@ schema version 1の保存済み結果も取得できますが、`metric_diffs` �
   "title": "マスター14+ 100枚",
   "achievement_type": "score_count",
   "achievement_params": { "score": 1007500, "count": 100 },
-  "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
+  "attributes": { "diff": "MASTER", "const": { "min": 14.0, "max": 14.9 } },
   "invert_value": false,
   "invert_percentage": true,
   "gauge_start": 0,
@@ -2771,44 +2772,33 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "chart_target": "OP_TARGET",
   "const": { "min": 14.0, "max": 14.4 },
   "const_filter_mode": "level",
-  "genre": [1, 2],
-  "ver": [20, 21],
+  "genre": ["POPS & ANIME", "niconico"],
+  "ver": ["3f2a9c1d0b4e5a67", "8d1e4b7a2c9f0e35"],
   "name_folder": ["A", "KA"]
 }
 ```
 
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
-| `diff` | `integer \| integer[]` | 任意 | 難易度ID（`difficulties.id` と同値、1〜5）。単一値または配列で指定可能。省略時は全難易度対象 |
+| `diff` | `string \| string[]` | 任意 | 難易度名（マスタデータの `difficulties[].name`。`BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`）。単一値または配列で指定可能。省略時は全難易度対象 |
 | `chart_target` | `"OP_TARGET"` | 任意 | 曲ごとの理論OVER POWER対象譜面のみを対象にする。`diff` との同時指定は不可 |
 | `const` | `object` | 任意 | 譜面定数レンジ。`min`/`max` を `float64`（小数1桁）で指定。`min <= max` 必須。範囲: `1.0 ≤ min, max ≤ 16.0`。省略時は定数条件なし |
 | `const_filter_mode` | `"level" \| "number"` | 任意 | `const` の入力方法。`level` はレベル指定、`number` は譜面定数指定。クライアントが再編集時に入力方法を復元するための値で、対象譜面の絞り込み・進捗計算には使わず、常に `const` の `min`/`max` を使います。省略時は `number` として扱い、APIは補完しません。`rainbow_count` では指定不可 |
-| `genre` | `integer \| integer[]` | 任意 | ジャンルマスタID。単一値または配列で指定可能。省略時は全ジャンル対象 |
-| `ver` | `integer \| integer[]` | 任意 | バージョンマスタID。単一値または配列で指定可能。省略時は全バージョン対象 |
+| `genre` | `string \| string[]` | 任意 | ジャンル名（マスタデータの `genres[].name`）。単一値または配列で指定可能。省略時は全ジャンル対象 |
+| `ver` | `string \| string[]` | 任意 | バージョンの公開ID（マスタデータの `versions[].id`）。バージョンは改名されるため名称ではなく公開IDで指定します。単一値または配列で指定可能。省略時は全バージョン対象 |
 | `name_folder` | `string \| string[]` | 任意 | 楽曲名順フォルダのコード（マスタデータの `name_folders[].code`）。単一値または配列で指定可能。省略時は全楽曲名順対象 |
 
-**難易度IDの対応**:
-
-| 値 | 難易度 |
-|---|---|
-| 1 | `BASIC` |
-| 2 | `ADVANCED` |
-| 3 | `EXPERT` |
-| 4 | `MASTER` |
-| 5 | `ULTIMA` |
-
 **マスタ整合**:
-- `genre` / `ver` は起動時プリロード済みのマスタIDのみ許可。存在しないIDは `goal_invalid_attributes` エラー。
-- `genre` / `ver` のIDは存在確認（一致判定）のみに使用し、IDの数値による順序比較・レンジ判定は行いません。
+- DBの数値IDは受け付けません。数値で指定すると `goal_invalid_attributes` エラーになります。
+- `diff` / `genre` は起動時プリロード済みのマスタ名、`ver` は稼働開始済みバージョンの公開IDのみ許可（完全一致）。存在しない値は `goal_invalid_attributes` エラー。
 - `name_folder` は楽曲名順フォルダマスタに存在するコードのみ許可（完全一致）。存在しないコードや数値は `goal_invalid_attributes` エラー。
-- `diff` は 1〜5 の範囲のみ許可。範囲外は `goal_invalid_attributes` エラー。
 - `chart_target` は `"OP_TARGET"` のみ許可。`diff` と同時指定した場合は `goal_invalid_attributes` エラー。
 - `const_filter_mode` は `"level"` / `"number"` の文字列のみ許可。それ以外の値や `null`・数値などの型は `goal_invalid_attributes` エラー。`const` の範囲がレベル境界と一致するかは検証しません。
 
 **配列入力の正規化**:
-- `diff` / `genre` / `ver` は単一値（例: `"diff": 4`）と配列（例: `"diff": [3, 4]`）の両方を受け付けます。
-- 配列は重複除去 + 昇順ソートで正規化されます。
-- 要素数1の配列は単一値に正規化されます（例: `"diff": [4]` → `"diff": 4`）。
+- `diff` / `genre` / `ver` は単一値（例: `"diff": "MASTER"`）と配列（例: `"diff": ["EXPERT", "MASTER"]`）の両方を受け付けます。
+- 配列は重複除去 + マスタの表示順（`diff` / `genre` は `sort_order` 昇順、`ver` はリリース日昇順）で正規化されます。
+- 要素数1の配列は単一値に正規化されます（例: `"diff": ["MASTER"]` → `"diff": "MASTER"`）。
 - `name_folder` は単一値（例: `"name_folder": "A"`）と配列（例: `"name_folder": ["A", "KA"]`）の両方を受け付け、配列は重複除去 + マスタの `sort_order` 昇順で正規化されます。要素数1の配列は単一値に正規化されます。
 - 配列の実質上限は、対応するマスタデータの全件数です。
 - レスポンスの `attributes` は正規化後の形式で返却されます（要素1ならスカラー、複数なら配列）。
@@ -2823,7 +2813,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 1. **`title`**: trim後に空文字・30ルーン超・制御文字を含む場合はエラー
 2. **`achievement_type`**: マスタキャッシュで検証。完全一致のみ許可（例: `score_count` は可、`Score_Count` は不可）
-3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `integer | integer[]` を受け付け、配列は重複除去+昇順ソートで正規化（要素1はスカラー化）。`name_folder` は `string | string[]` を受け付け、重複除去+`sort_order` 昇順で正規化（要素1はスカラー化）。`chart_target` は `"OP_TARGET"` のみ許可し、`diff` とは排他。`const_filter_mode` は `"level"` / `"number"` のみ許可。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 16.0]`
+3. **`attributes`**: 許可キーのみ。各値をマスタ検証。`diff` / `genre` / `ver` は `string | string[]`（`diff` / `genre` はマスタ名、`ver` はバージョンの公開ID）を受け付け、配列は重複除去+マスタの表示順で正規化（要素1はスカラー化）。`name_folder` は `string | string[]` を受け付け、重複除去+`sort_order` 昇順で正規化（要素1はスカラー化）。`chart_target` は `"OP_TARGET"` のみ許可し、`diff` とは排他。`const_filter_mode` は `"level"` / `"number"` のみ許可。`const` は小数1桁に丸め、`min <= max`、有効範囲 `[1.0, 16.0]`
 4. **`achievement_params`**: `achievement_type` に対応する構造体へデコードし、パラメータ値を検証
 5. **`gauge_start`**: `achievement_type` ごとの範囲と小数桁数を検証。`0` の場合と `avg_score` の場合は `apply_gauge_start_to_percentage` を `false` に正規化
 6. **動的上限チェック**: `attributes` で絞り込まれた対象譜面数をもとに以下を検証
@@ -2858,7 +2848,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
       "title": "マスター14+ 100枚",
       "achievement_type": "score_count",
       "achievement_params": { "score": 1007500, "count": 100 },
-      "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
+      "attributes": { "diff": "MASTER", "const": { "min": 14.0, "max": 14.9 } },
       "invert_value": false,
       "invert_percentage": true,
       "gauge_start": 0,
@@ -2884,7 +2874,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
   "title": "マスター14+ 100枚",
   "achievement_type": "score_count",
   "achievement_params": { "score": 1007500, "count": 100 },
-  "attributes": { "diff": 4, "const": { "min": 14.0, "max": 14.9 } },
+  "attributes": { "diff": "MASTER", "const": { "min": 14.0, "max": 14.9 } },
   "invert_value": false,
   "invert_percentage": true,
   "gauge_start": 0,
@@ -2944,7 +2934,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 | `goal_invalid_title` | 400 | `title` が trim 後に空文字、30文字超、または制御文字を含む |
 | `goal_invalid_achievement_type` | 400 | `achievement_type` が不正（マスタに存在しない・大文字小文字不一致） |
 | `goal_invalid_achievement_params` | 400 | `achievement_params` の形式不正・範囲不正・動的上限超過・`achievement_type` との組み合わせ不一致 |
-| `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合・未許可キー・`const` 範囲外・`diff` 範囲外 |
+| `goal_invalid_attributes` | 400 | `attributes` の形式不正・マスタ不整合（数値IDでの指定を含む）・未許可キー・`const` 範囲外 |
 | `goal_invalid_gauge_start` | 400 | `gauge_start` が `achievement_type` ごとの範囲外、または許可されない小数桁数 |
 | `goal_invalid_order` | 400 | `goal_ids` が指定グループ（`group_id` の省略・`null` は未分類）に現在所属する目標IDの集合と一致しない、または重複している |
 | `invalid_goal_input` | 400 | goal 入力全般の不正（JSONデコード失敗など） |
@@ -4951,14 +4941,14 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/honors`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **概要**: 称号マスタをID昇順で全件取得します。
+- **概要**: 称号マスタを登録順で全件取得します。
 - **レスポンス**: 200 OK
 
 ```json
 {
   "honors": [
     {
-      "id": 1,
+      "id": "5b0c8e2f7a1d9346",
       "name": "称号名",
       "type_name": "gold",
       "image_url": "https://example.com/honor.png",
@@ -4971,7 +4961,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/honors/:id`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **パスパラメータ**: `id` - 称号ID
+- **パスパラメータ**: `id` - `HonorDTO` の `id`（公開ID）。DBの数値IDは受け付けず、形式不正は `validation_failed`（422）を返します。
 - **概要**: 指定IDの称号を取得します。
 - **レスポンス**: 200 OK (`HonorDTO`)
 
@@ -4994,7 +4984,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### PUT `/internal/honors/:id`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **パスパラメータ**: `id` - 称号ID
+- **パスパラメータ**: `id` - `HonorDTO` の `id`（公開ID）。DBの数値IDは受け付けず、形式不正は `validation_failed`（422）を返します。
 - **概要**: 指定IDの称号を更新します。`type_name` は `GET /internal/master/honor-types` の `name` を指定します。
 - **リクエストボディ**: `POST /internal/honors` と同一
 - **レスポンス**: 200 OK (`HonorDTO`)
@@ -5002,7 +4992,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### DELETE `/internal/honors/:id`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **パスパラメータ**: `id` - 称号ID
+- **パスパラメータ**: `id` - `HonorDTO` の `id`（公開ID）。DBの数値IDは受け付けず、形式不正は `validation_failed`（422）を返します。
 - **概要**: 指定IDの称号を物理削除します。プレイヤーに割り当て済みの称号は削除できません。
 - **レスポンス**: 204 No Content
 
@@ -5010,7 +5000,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `id` | int | 称号ID |
+| `id` | string | 称号の公開ID（16文字の小文字16進数）。登録時にサーバーが採番し、DBの数値IDとは独立している |
 | `name` | string | 称号名 |
 | `type_name` | string | 称号タイプ名 |
 | `image_url` | string | 称号画像URL。未設定時は空文字 |
@@ -5141,6 +5131,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 - **認証**: 不要
 - **概要**: フロントエンド向けにマスタデータ（楽曲名順フォルダ、ジャンル、難易度、アカウント種別、バージョン、レーティング帯、成果種別、クラスエンブレム、クリアランプ、コンボランプ、フルチェインランプ、スロット、称号タイプ、ポゼッション）を返却します。
 - `achievement_types` は目標APIの `achievement_type` を表示・入力補助するための辞書として利用します。
+- DBの数値IDは返しません。各マスタは一意な `name`（レーティング帯は `label`、楽曲名順フォルダは `code`）で識別します。バージョンは改名されるため、DB主キーと独立した公開IDを `id` として返します。目標APIの `attributes.diff` / `genre` は `name`、`ver` はこの `id` で指定します。
 - **レスポンス**: 200 OK
 
 ```json
@@ -5150,94 +5141,94 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
     { "code": "EFGH", "name": "EFGH", "sort_order": 2 }
   ],
   "genres": [
-    { "id": 1, "name": "POPS & ANIME", "short_name": "P&A" },
-    { "id": 2, "name": "niconico", "short_name": "nico" },
-    { "id": 3, "name": "東方Project", "short_name": "東方" }
+    { "name": "POPS & ANIME", "short_name": "P&A" },
+    { "name": "niconico", "short_name": "nico" },
+    { "name": "東方Project", "short_name": "東方" }
   ],
   "difficulties": [
-    { "id": 1, "name": "BASIC" },
-    { "id": 2, "name": "ADVANCED" },
-    { "id": 3, "name": "EXPERT" },
-    { "id": 4, "name": "MASTER" },
-    { "id": 5, "name": "ULTIMA" }
+    { "name": "BASIC" },
+    { "name": "ADVANCED" },
+    { "name": "EXPERT" },
+    { "name": "MASTER" },
+    { "name": "ULTIMA" }
   ],
   "account_types": [
-    { "id": 1, "name": "PLAYER" },
-    { "id": 2, "name": "EDITOR" },
-    { "id": 3, "name": "ADMIN" },
-    { "id": 4, "name": "EXTDEV" }
+    { "name": "PLAYER" },
+    { "name": "EDITOR" },
+    { "name": "ADMIN" },
+    { "name": "EXTDEV" }
   ],
   "versions": [
-    { "id": 1, "name": "CHUNITHM", "short_name": "ORI", "released_at": "2015-07-16" },
-    { "id": 2, "name": "CHUNITHM PLUS", "short_name": "ORI+", "released_at": "2016-02-04" },
-    { "id": 3, "name": "CHUNITHM AIR", "short_name": "AIR", "released_at": "2016-08-25" }
+    { "id": "3f2a9c1d0b4e5a67", "name": "CHUNITHM", "short_name": "ORI", "released_at": "2015-07-16" },
+    { "id": "8d1e4b7a2c9f0e35", "name": "CHUNITHM PLUS", "short_name": "ORI+", "released_at": "2016-02-04" },
+    { "id": "c47b0e9f15a3d826", "name": "CHUNITHM AIR", "short_name": "AIR", "released_at": "2016-08-25" }
   ],
   "rating_bands": [
-    { "id": 1, "label": "～14.9", "min_inclusive": null, "max_exclusive": 15.0, "sort_order": 1 },
-    { "id": 2, "label": "15.0", "min_inclusive": 15.0, "max_exclusive": 15.1, "sort_order": 2 },
-    { "id": 28, "label": "17.6", "min_inclusive": 17.6, "max_exclusive": 17.7, "sort_order": 28 },
-    { "id": 29, "label": "17.7+", "min_inclusive": 17.7, "max_exclusive": null, "sort_order": 29 }
+    { "label": "～14.9", "min_inclusive": null, "max_exclusive": 15.0, "sort_order": 1 },
+    { "label": "15.0", "min_inclusive": 15.0, "max_exclusive": 15.1, "sort_order": 2 },
+    { "label": "17.6", "min_inclusive": 17.6, "max_exclusive": 17.7, "sort_order": 28 },
+    { "label": "17.7+", "min_inclusive": 17.7, "max_exclusive": null, "sort_order": 29 }
   ],
   "achievement_types": [
-    { "id": 1, "name": "rank_count" },
-    { "id": 2, "name": "score_count" },
-    { "id": 3, "name": "avg_score" }
+    { "name": "rank_count" },
+    { "name": "score_count" },
+    { "name": "avg_score" }
   ],
   "class_emblems": [
-    { "id": 1, "name": "1" },
-    { "id": 2, "name": "2" },
-    { "id": 3, "name": "3" },
-    { "id": 4, "name": "4" },
-    { "id": 5, "name": "5" },
-    { "id": 6, "name": "inf" }
+    { "name": "1" },
+    { "name": "2" },
+    { "name": "3" },
+    { "name": "4" },
+    { "name": "5" },
+    { "name": "inf" }
   ],
   "class_emblem_bases": [
-    { "id": 1, "name": "1" },
-    { "id": 2, "name": "2" },
-    { "id": 3, "name": "3" },
-    { "id": 4, "name": "4" },
-    { "id": 5, "name": "5" },
-    { "id": 6, "name": "inf" }
+    { "name": "1" },
+    { "name": "2" },
+    { "name": "3" },
+    { "name": "4" },
+    { "name": "5" },
+    { "name": "inf" }
   ],
   "clear_lamps": [
-    { "id": 1, "name": "FAILED" },
-    { "id": 2, "name": "CLEAR" },
-    { "id": 3, "name": "HARD" },
-    { "id": 4, "name": "BRAVE" },
-    { "id": 5, "name": "ABSOLUTE" },
-    { "id": 6, "name": "CATASTROPHY" }
+    { "name": "FAILED" },
+    { "name": "CLEAR" },
+    { "name": "HARD" },
+    { "name": "BRAVE" },
+    { "name": "ABSOLUTE" },
+    { "name": "CATASTROPHY" }
   ],
   "combo_lamps": [
-    { "id": 1, "name": "NONE" },
-    { "id": 2, "name": "FULL COMBO" },
-    { "id": 3, "name": "ALL JUSTICE" }
+    { "name": "NONE" },
+    { "name": "FULL COMBO" },
+    { "name": "ALL JUSTICE" }
   ],
   "full_chains": [
-    { "id": 1, "name": "NONE" },
-    { "id": 2, "name": "FULL CHAIN GOLD" },
-    { "id": 3, "name": "FULL CHAIN PLATINUM" }
+    { "name": "NONE" },
+    { "name": "FULL CHAIN GOLD" },
+    { "name": "FULL CHAIN PLATINUM" }
   ],
   "slots": [
-    { "id": 1, "name": "none" },
-    { "id": 2, "name": "best" },
-    { "id": 3, "name": "best_candidate" },
-    { "id": 4, "name": "new" },
-    { "id": 5, "name": "new_candidate" }
+    { "name": "none" },
+    { "name": "best" },
+    { "name": "best_candidate" },
+    { "name": "new" },
+    { "name": "new_candidate" }
   ],
   "honor_types": [
-    { "id": 1, "name": "normal" },
-    { "id": 2, "name": "copper" },
-    { "id": 3, "name": "silver" },
-    { "id": 4, "name": "gold" },
-    { "id": 5, "name": "platina" },
-    { "id": 6, "name": "rainbow" }
+    { "name": "normal" },
+    { "name": "copper" },
+    { "name": "silver" },
+    { "name": "gold" },
+    { "name": "platina" },
+    { "name": "rainbow" }
   ],
   "possessions": [
-    { "id": 1, "name": "normal" },
-    { "id": 2, "name": "silver" },
-    { "id": 3, "name": "gold" },
-    { "id": 4, "name": "platina" },
-    { "id": 5, "name": "rainbow" }
+    { "name": "normal" },
+    { "name": "silver" },
+    { "name": "gold" },
+    { "name": "platina" },
+    { "name": "rainbow" }
   ]
 }
 ```
@@ -5266,22 +5257,20 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `id` | int | マスタID |
-| `name` | string | マスタ名称。`achievement_types` の場合は表示名ではなく成果種別コード |
+| `name` | string | マスタ名称（マスタ内で一意）。`achievement_types` の場合は表示名ではなく成果種別コード |
 
 **GenreDTO**:
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `id` | int | ジャンルID |
-| `name` | string | ジャンル名称 |
+| `name` | string | ジャンル名称（一意）。目標APIの `attributes.genre` に指定する値 |
 | `short_name` | string | 表示幅を抑えるための超ショート名（CHUNITHM Wikiの略記。例: `P&A`） |
 
 **VersionDTO**:
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `id` | int | バージョンID |
+| `id` | string | バージョンの公開ID（16文字の小文字16進数）。DBの数値IDではない。目標APIの `attributes.ver` に指定する値 |
 | `name` | string | バージョン名称 |
 | `short_name` | string | 表示幅を抑えるための超ショート名（例: `CRY+`） |
 | `released_at` | string | リリース日（`YYYY-MM-DD`形式） |
@@ -5290,8 +5279,7 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `id` | int | レーティング帯ID |
-| `label` | string | 表示ラベル（例: "15.0", "17.7+"） |
+| `label` | string | 表示ラベル（一意。例: "15.0", "17.7+"） |
 | `min_inclusive` | number\|null | 下限（未設定の場合は下限なし） |
 | `max_exclusive` | number\|null | 上限（未設定の場合は上限なし） |
 | `sort_order` | int | 表示順 |
@@ -5372,9 +5360,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ```json
 {
   "genres": [
-    { "id": 1, "name": "POPS & ANIME", "short_name": "P&A" },
-    { "id": 2, "name": "niconico", "short_name": "nico" },
-    { "id": 3, "name": "東方Project", "short_name": "東方" }
+    { "name": "POPS & ANIME", "short_name": "P&A" },
+    { "name": "niconico", "short_name": "nico" },
+    { "name": "東方Project", "short_name": "東方" }
   ]
 }
 ```
@@ -5404,9 +5392,9 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ```json
 {
   "honor_types": [
-    { "id": 1, "name": "normal" },
-    { "id": 2, "name": "copper" },
-    { "id": 3, "name": "silver" }
+    { "name": "normal" },
+    { "name": "copper" },
+    { "name": "silver" }
   ]
 }
 ```

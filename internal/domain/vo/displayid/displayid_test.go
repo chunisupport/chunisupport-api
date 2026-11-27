@@ -83,3 +83,16 @@ func TestDisplayID_IsValid(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerate(t *testing.T) {
+	// When
+	first, err := Generate()
+	require.NoError(t, err)
+	second, err := Generate()
+	require.NoError(t, err)
+
+	// Then: 形式が有効で、呼び出しごとに異なる値になる
+	assert.True(t, first.IsValid())
+	assert.True(t, second.IsValid())
+	assert.NotEqual(t, first, second)
+}

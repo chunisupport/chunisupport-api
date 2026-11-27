@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 	"github.com/jmoiron/sqlx"
 )
@@ -20,6 +21,7 @@ type honorRepository struct {
 
 type honorRow struct {
 	ID          int        `db:"id"`
+	DisplayID   string     `db:"display_id"`
 	Name        string     `db:"name"`
 	HonorTypeID int        `db:"honor_type_id"`
 	TypeName    string     `db:"type_name"`
@@ -36,7 +38,7 @@ func NewHonorRepository(db *sqlx.DB) repository.HonorRepository {
 func (r *honorRepository) FindAll(ctx context.Context, exec repository.Executor) ([]*entity.Honor, error) {
 	rows := []honorRow{}
 	if err := exec.SelectContext(ctx, &rows, `
-		SELECT h.id, h.name, h.honor_type_id, ht.name AS type_name, COALESCE(h.image_url, '') AS image_url, h.created_at
+		SELECT h.id, h.display_id, h.name, h.honor_type_id, ht.name AS type_name, COALESCE(h.image_url, '') AS image_url, h.created_at
 		FROM honors h
 		INNER JOIN honor_types ht ON h.honor_type_id = ht.id
 		ORDER BY h.id
@@ -51,15 +53,15 @@ func (r *honorRepository) FindAll(ctx context.Context, exec repository.Executor)
 	return honors, nil
 }
 
-// FindByID は指定IDの称号を取得します。
-func (r *honorRepository) FindByID(ctx context.Context, exec repository.Executor, id int) (*entity.Honor, error) {
+// FindByDisplayID は指定した公開IDの称号を取得します。
+func (r *honorRepository) FindByDisplayID(ctx context.Context, exec repository.Executor, displayID displayid.DisplayID) (*entity.Honor, error) {
 	var row honorRow
 	if err := exec.GetContext(ctx, &row, `
-		SELECT h.id, h.name, h.honor_type_id, ht.name AS type_name, COALESCE(h.image_url, '') AS image_url, h.created_at
+		SELECT h.id, h.display_id, h.name, h.honor_type_id, ht.name AS type_name, COALESCE(h.image_url, '') AS image_url, h.created_at
 		FROM honors h
 		INNER JOIN honor_types ht ON h.honor_type_id = ht.id
-		WHERE h.id = ?
-	`, id); err != nil {
+		WHERE h.display_id = ?
+	`, displayID.String()); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, repository.ErrHonorNotFound
 		}
@@ -70,19 +72,13 @@ func (r *honorRepository) FindByID(ctx context.Context, exec repository.Executor
 
 // Create は称号を新規登録します。
 func (r *honorRepository) Create(ctx context.Context, exec repository.Executor, honor *entity.Honor) (*entity.Honor, error) {
-	result, err := exec.ExecContext(ctx, `
-		INSERT INTO honors (name, honor_type_id, image_url)
-		VALUES (?, ?, ?)
-	`, strings.TrimSpace(honor.Name), honor.HonorTypeID, nullableHonorImageURL(honor.ImageURL))
-	if err != nil {
+	if _, err := exec.ExecContext(ctx, `
+		INSERT INTO honors (display_id, name, honor_type_id, image_url)
+		VALUES (?, ?, ?, ?)
+	`, honor.DisplayID.String(), strings.TrimSpace(honor.Name), honor.HonorTypeID, nullableHonorImageURL(honor.ImageURL)); err != nil {
 		return nil, wrapHonorDuplicateError(err)
 	}
-
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
-	}
-	return r.FindByID(ctx, exec, int(id))
+	return r.FindByDisplayID(ctx, exec, honor.DisplayID)
 }
 
 // Save は称号を更新します。
@@ -106,9 +102,9 @@ func (r *honorRepository) Save(ctx context.Context, exec repository.Executor, ho
 	return nil
 }
 
-// Delete は称号を物理削除します。
-func (r *honorRepository) Delete(ctx context.Context, exec repository.Executor, id int) error {
-	result, err := exec.ExecContext(ctx, `DELETE FROM honors WHERE id = ?`, id)
+// DeleteByDisplayID は指定した公開IDの称号を物理削除します。
+func (r *honorRepository) DeleteByDisplayID(ctx context.Context, exec repository.Executor, displayID displayid.DisplayID) error {
+	result, err := exec.ExecContext(ctx, `DELETE FROM honors WHERE display_id = ?`, displayID.String())
 	if err != nil {
 		return wrapHonorReferencedError(err)
 	}
@@ -126,6 +122,7 @@ func (r *honorRepository) Delete(ctx context.Context, exec repository.Executor, 
 func toHonorEntity(row *honorRow) *entity.Honor {
 	return &entity.Honor{
 		ID:          row.ID,
+		DisplayID:   displayid.DisplayID(row.DisplayID),
 		Name:        row.Name,
 		HonorTypeID: row.HonorTypeID,
 		TypeName:    row.TypeName,
@@ -163,12 +160,16 @@ func (r *honorRepository) EnsureHonor(ctx context.Context, exec repository.Execu
 			return repository.HonorEnsureResult{ID: existingID}, err
 		}
 	}
+	displayID, err := displayid.Generate()
+	if err != nil {
+		return repository.HonorEnsureResult{}, err
+	}
 	// 検索後に並行登録された場合に備え、通常称号は重複時に既存IDを返すUpsertとする。
-	query := `INSERT INTO honors (name, honor_type_id, image_url) VALUES (?, ?, ?)`
+	query := `INSERT INTO honors (display_id, name, honor_type_id, image_url) VALUES (?, ?, ?, ?)`
 	if storedImageURL == nil && (r.db == nil || r.db.DriverName() != "sqlite") {
 		query += ` ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)`
 	}
-	result, err := exec.ExecContext(ctx, query, storedTitle, honorTypeID, storedImageURL)
+	result, err := exec.ExecContext(ctx, query, displayID.String(), storedTitle, honorTypeID, storedImageURL)
 	if err != nil {
 		if storedImageURL != nil && (isMySQLDuplicateEntryForKey(err, "unique_honor_image_url") ||
 			isMySQLDuplicateEntryForKey(err, "unique_honor_name_type")) {
