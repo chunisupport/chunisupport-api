@@ -6,13 +6,13 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
 	"github.com/stretchr/testify/assert"
@@ -27,10 +27,8 @@ type versionUsecaseMock struct {
 	createCall bool
 	renameCall bool
 	deleteCall bool
-	deleteID   displayid.DisplayID
+	deleteID   int
 }
-
-const testVersionDisplayID displayid.DisplayID = "0123456789abcdef"
 
 func (m *versionUsecaseMock) ListAll(context.Context) ([]*entity.Version, error) {
 	return m.versions, nil
@@ -40,23 +38,23 @@ func (m *versionUsecaseMock) Create(_ context.Context, name, shortName string, r
 	if m.createErr != nil {
 		return nil, m.createErr
 	}
-	return &entity.Version{ID: 1, DisplayID: testVersionDisplayID, Name: name, ShortName: shortName, ReleasedAt: releasedAt}, nil
+	return &entity.Version{ID: 1, Name: name, ShortName: shortName, ReleasedAt: releasedAt}, nil
 }
-func (m *versionUsecaseMock) Rename(_ context.Context, id displayid.DisplayID, name, shortName string) (*entity.Version, error) {
+func (m *versionUsecaseMock) Rename(_ context.Context, id int, name, shortName string) (*entity.Version, error) {
 	m.renameCall = true
 	if m.renameErr != nil {
 		return nil, m.renameErr
 	}
-	return &entity.Version{ID: 1, DisplayID: id, Name: name, ShortName: shortName, ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}, nil
+	return &entity.Version{ID: id, Name: name, ShortName: shortName, ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}, nil
 }
-func (m *versionUsecaseMock) Delete(_ context.Context, id displayid.DisplayID) error {
+func (m *versionUsecaseMock) Delete(_ context.Context, id int) error {
 	m.deleteCall = true
 	m.deleteID = id
 	return m.deleteErr
 }
 
 func TestVersionHandler_List(t *testing.T) {
-	uc := &versionUsecaseMock{versions: []*entity.Version{{ID: 1, DisplayID: testVersionDisplayID, Name: "CHUNITHM VERSE", ShortName: "VRS", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}}}
+	uc := &versionUsecaseMock{versions: []*entity.Version{{ID: 1, Name: "CHUNITHM VERSE", ShortName: "VRS", ReleasedAt: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)}}}
 	handler := NewVersionHandler(uc)
 	e := echo.New()
 	rec := httptest.NewRecorder()
@@ -66,7 +64,7 @@ func TestVersionHandler_List(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `[{"id":"0123456789abcdef","name":"CHUNITHM VERSE","short_name":"VRS","released_at":"2025-01-01"}]`, rec.Body.String())
+	assert.JSONEq(t, `[{"id":1,"name":"CHUNITHM VERSE","short_name":"VRS","released_at":"2025-01-01"}]`, rec.Body.String())
 }
 
 func TestVersionHandler_Create(t *testing.T) {
@@ -83,7 +81,7 @@ func TestVersionHandler_Create(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusCreated, rec.Code)
 	assert.True(t, uc.createCall)
-	assert.JSONEq(t, `{"id":"0123456789abcdef","name":"CHUNITHM VERSE","short_name":"VRS","released_at":"2025-01-01"}`, rec.Body.String())
+	assert.JSONEq(t, `{"id":1,"name":"CHUNITHM VERSE","short_name":"VRS","released_at":"2025-01-01"}`, rec.Body.String())
 }
 
 func TestVersionHandler_Create_不正JSONは400(t *testing.T) {
@@ -135,10 +133,10 @@ func TestVersionHandler_Rename_厳格JSONは400(t *testing.T) {
 	uc := &versionUsecaseMock{}
 	handler := NewVersionHandler(uc)
 	e := echo.New()
-	req := httptest.NewRequest(http.MethodPut, "/internal/admin/versions/0123456789abcdef", bytes.NewBufferString(`{"name":"CHUNITHM VERSE","unknown":1}`))
+	req := httptest.NewRequest(http.MethodPut, "/internal/admin/versions/1", bytes.NewBufferString(`{"name":"CHUNITHM VERSE","unknown":1}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	c := e.NewContext(req, httptest.NewRecorder())
-	c.SetPathValues(echo.PathValues{{Name: "id", Value: testVersionDisplayID.String()}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
 
 	err := handler.Rename(c)
 
@@ -183,10 +181,10 @@ func TestVersionHandler_Rename(t *testing.T) {
 	handler := NewVersionHandler(uc)
 	e := echo.New()
 	rec := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/internal/admin/versions/0123456789abcdef", bytes.NewBufferString(`{"name":"CHUNITHM VERSE","short_name":"VRS"}`))
+	req := httptest.NewRequest(http.MethodPut, "/internal/admin/versions/1", bytes.NewBufferString(`{"name":"CHUNITHM VERSE","short_name":"VRS"}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "id", Value: testVersionDisplayID.String()}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
 
 	// When
 	err := handler.Rename(c)
@@ -194,7 +192,7 @@ func TestVersionHandler_Rename(t *testing.T) {
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"id":"0123456789abcdef","name":"CHUNITHM VERSE","short_name":"VRS","released_at":"2025-01-01"}`, rec.Body.String())
+	assert.JSONEq(t, `{"id":1,"name":"CHUNITHM VERSE","short_name":"VRS","released_at":"2025-01-01"}`, rec.Body.String())
 }
 
 func TestVersionHandler_Rename_不正IDは400(t *testing.T) {
@@ -205,7 +203,6 @@ func TestVersionHandler_Rename_不正IDは400(t *testing.T) {
 		{name: "不正文字列は拒否する", id: "invalid"},
 		{name: "ID0は拒否する", id: "0"},
 		{name: "IDマイナス1は拒否する", id: "-1"},
-		{name: "DBの数値主キーは拒否する", id: "7"},
 	}
 
 	for _, tt := range tests {
@@ -238,10 +235,10 @@ func TestVersionHandler_Rename_releasedAtは拒否する(t *testing.T) {
 			handler := NewVersionHandler(uc)
 			e := echo.New()
 			body := `{"name":"CHUNITHM VERSE","released_at":` + releasedAt + `}`
-			req := httptest.NewRequest(http.MethodPut, "/internal/admin/versions/0123456789abcdef", bytes.NewBufferString(body))
+			req := httptest.NewRequest(http.MethodPut, "/internal/admin/versions/1", bytes.NewBufferString(body))
 			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 			c := e.NewContext(req, httptest.NewRecorder())
-			c.SetPathValues(echo.PathValues{{Name: "id", Value: testVersionDisplayID.String()}})
+			c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
 
 			err := handler.Rename(c)
 
@@ -266,28 +263,28 @@ func TestVersionHandler_Delete_競合エラーを対応付ける(t *testing.T) {
 			uc := &versionUsecaseMock{deleteErr: tt.err}
 			handler := NewVersionHandler(uc)
 			e := echo.New()
-			c := e.NewContext(httptest.NewRequest(http.MethodDelete, "/internal/admin/versions/0123456789abcdef", nil), httptest.NewRecorder())
-			c.SetPathValues(echo.PathValues{{Name: "id", Value: testVersionDisplayID.String()}})
+			c := e.NewContext(httptest.NewRequest(http.MethodDelete, "/internal/admin/versions/1", nil), httptest.NewRecorder())
+			c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
 
 			err := handler.Delete(c)
 
 			apiErr := requireVersionAPIError(t, err)
 			assert.Equal(t, http.StatusConflict, apiErr.HTTPStatus)
 			assert.Equal(t, tt.code, apiErr.Code)
-			assert.Equal(t, testVersionDisplayID, uc.deleteID)
+			assert.Equal(t, 1, uc.deleteID)
 		})
 	}
 }
 
 func TestVersionHandler_Delete_正常系(t *testing.T) {
 	// DELETEは204 No Contentで空本文を返す契約のため、パスIDと転送IDの一致まで検証する。
-	// 固定ID実装を両方向で捉えるため、2通りの公開IDで確認する。
+	// 固定ID実装を両方向で捉えるため、1以外の2通りで確認する。
 	tests := []struct {
 		name string
-		id   displayid.DisplayID
+		id   int
 	}{
-		{name: "公開ID 00000000000000a7 を削除する", id: "00000000000000a7"},
-		{name: "公開ID fedcba9876543210 を削除する", id: "fedcba9876543210"},
+		{name: "ID7を削除する", id: 7},
+		{name: "ID12を削除する", id: 12},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -296,7 +293,7 @@ func TestVersionHandler_Delete_正常系(t *testing.T) {
 			handler := NewVersionHandler(uc)
 			e := echo.New()
 			rec := httptest.NewRecorder()
-			idValue := tt.id.String()
+			idValue := strconv.Itoa(tt.id)
 			c := e.NewContext(httptest.NewRequest(http.MethodDelete, "/internal/admin/versions/"+idValue, nil), rec)
 			c.SetPathValues(echo.PathValues{{Name: "id", Value: idValue}})
 
@@ -321,7 +318,6 @@ func TestVersionHandler_Delete_数値下限は400(t *testing.T) {
 	}{
 		{name: "ID0は拒否する", id: "0"},
 		{name: "IDマイナス1は拒否する", id: "-1"},
-		{name: "DBの数値主キーは拒否する", id: "7"},
 	}
 
 	for _, tt := range tests {

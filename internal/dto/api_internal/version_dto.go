@@ -22,9 +22,8 @@ type RenameVersionRequest struct {
 }
 
 // VersionDTO は管理者向けバージョン情報です。
-// id にはDBの数値主キーではなく公開ID（display_id）を返します。
 type VersionDTO struct {
-	ID         string `json:"id"`
+	ID         int    `json:"id"`
 	Name       string `json:"name"`
 	ShortName  string `json:"short_name"`
 	ReleasedAt string `json:"released_at"`
@@ -34,7 +33,7 @@ func ToVersionDTO(version *entity.Version) *VersionDTO {
 	if version == nil {
 		return nil
 	}
-	return &VersionDTO{ID: version.DisplayID.String(), Name: version.Name, ShortName: version.ShortName, ReleasedAt: version.ReleasedAt.Format(time.DateOnly)}
+	return &VersionDTO{ID: version.ID, Name: version.Name, ShortName: version.ShortName, ReleasedAt: version.ReleasedAt.Format(time.DateOnly)}
 }
 
 func ToVersionDTOs(versions []*entity.Version) []*VersionDTO {

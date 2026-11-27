@@ -3,16 +3,11 @@ package entity
 import (
 	"strings"
 	"time"
-
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 )
 
 // Honor は称号マスタの1件を表します。
 type Honor struct {
-	// ID はDB内部の参照専用で、APIには公開しません。
-	ID int
-	// DisplayID はAPI上の id として公開する識別子です。
-	DisplayID   displayid.DisplayID
+	ID          int
 	Name        string
 	HonorTypeID int
 	TypeName    string
@@ -21,9 +16,8 @@ type Honor struct {
 }
 
 // NewHonor は保存可能な称号エンティティを生成します。
-func NewHonor(displayID displayid.DisplayID, name string, honorTypeID int, typeName string, imageURL string) *Honor {
+func NewHonor(name string, honorTypeID int, typeName string, imageURL string) *Honor {
 	return &Honor{
-		DisplayID:   displayID,
 		Name:        strings.TrimSpace(name),
 		HonorTypeID: honorTypeID,
 		TypeName:    strings.TrimSpace(typeName),

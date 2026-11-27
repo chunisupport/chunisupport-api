@@ -9,7 +9,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
@@ -31,11 +30,7 @@ func (u *versionUsecaseImpl) ListAll(ctx context.Context) ([]*entity.Version, er
 }
 
 func (u *versionUsecaseImpl) Create(ctx context.Context, name, shortName string, releasedAt time.Time) (*entity.Version, error) {
-	displayID, err := displayid.Generate()
-	if err != nil {
-		return nil, err
-	}
-	version, err := entity.NewVersion(displayID, name, shortName, releasedAt)
+	version, err := entity.NewVersion(name, shortName, releasedAt)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidVersionInput, err)
 	}
@@ -64,13 +59,17 @@ func (u *versionUsecaseImpl) Create(ctx context.Context, name, shortName string,
 	return created, nil
 }
 
-func (u *versionUsecaseImpl) Rename(ctx context.Context, id displayid.DisplayID, newName, newShortName string) (*entity.Version, error) {
+func (u *versionUsecaseImpl) Rename(ctx context.Context, id int, newName, newShortName string) (*entity.Version, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidVersionInput)
+	}
+
 	u.updateMu.Lock()
 	defer u.updateMu.Unlock()
 
 	var updated *entity.Version
 	err := u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		current, err := u.versionRepo.FindByDisplayIDForUpdate(ctx, tx, id)
+		current, err := u.versionRepo.FindByIDForUpdate(ctx, tx, id)
 		if err != nil {
 			return err
 		}
@@ -90,14 +89,18 @@ func (u *versionUsecaseImpl) Rename(ctx context.Context, id displayid.DisplayID,
 	return updated, nil
 }
 
-func (u *versionUsecaseImpl) Delete(ctx context.Context, id displayid.DisplayID) error {
+func (u *versionUsecaseImpl) Delete(ctx context.Context, id int) error {
+	if id <= 0 {
+		return fmt.Errorf("%w: id must be positive", ErrInvalidVersionInput)
+	}
+
 	u.updateMu.Lock()
 	defer u.updateMu.Unlock()
 	versionRangeMutationMu.Lock()
 	defer versionRangeMutationMu.Unlock()
 
 	err := u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		current, err := u.versionRepo.FindByDisplayIDForUpdate(ctx, tx, id)
+		current, err := u.versionRepo.FindByIDForUpdate(ctx, tx, id)
 		if err != nil {
 			return err
 		}
@@ -115,7 +118,7 @@ func (u *versionUsecaseImpl) Delete(ctx context.Context, id displayid.DisplayID)
 		if inUse {
 			return ErrVersionInUse
 		}
-		return u.versionRepo.Delete(ctx, tx, current.ID)
+		return u.versionRepo.Delete(ctx, tx, id)
 	})
 	if err != nil {
 		return err

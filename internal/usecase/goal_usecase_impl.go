@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,7 +16,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainmasterdata "github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/info"
 )
 
@@ -405,13 +403,13 @@ func validateAttributes(
 			return nil, nil, ErrInvalidGoalAttributes
 		}
 	}
-	if difficulties, ok, err := validateAndNormalizeAttributeValues(attrs, "diff", masters.Difficulties, compareDifficulties); err != nil {
+	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "diff", func(id int) bool {
+		_, exists := masters.DifficultyNamesByID[id]
+		return exists
+	}); err != nil {
 		return nil, nil, err
 	} else if ok {
-		result.DifficultyIDs = make([]int, len(difficulties))
-		for i, difficulty := range difficulties {
-			result.DifficultyIDs[i] = difficulty.ID
-		}
+		result.DifficultyIDs = ids
 	}
 	if v, ok := attrs["const"]; ok {
 		var c struct {
@@ -458,19 +456,23 @@ func validateAttributes(
 			return nil, nil, ErrInvalidGoalAttributes
 		}
 	}
-	if genres, ok, err := validateAndNormalizeAttributeValues(attrs, "genre", masters.Genres, compareGenres); err != nil {
+	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "genre", func(id int) bool {
+		_, exists := masters.GenreNamesByID[id]
+		return exists
+	}); err != nil {
 		return nil, nil, err
 	} else if ok {
-		result.GenreIDs = make([]int, len(genres))
-		for i, genre := range genres {
-			result.GenreIDs[i] = genre.ID
-		}
+		result.GenreIDs = ids
 	}
-	if versions, ok, err := validateAndNormalizeAttributeValues(attrs, "ver", masters.VersionsByDisplayID, compareVersions); err != nil {
+	if ids, ok, err := validateAndNormalizeAttributeIDs(attrs, "ver", func(id int) bool {
+		_, exists := masters.VersionsByID[id]
+		return exists
+	}); err != nil {
 		return nil, nil, err
 	} else if ok {
-		ranges := make([]repository.VersionRange, 0, len(versions))
-		for _, version := range versions {
+		ranges := make([]repository.VersionRange, 0, len(ids))
+		for _, id := range ids {
+			version := masters.VersionsByID[id]
 			ranges = append(ranges, repository.VersionRange{
 				From: version.ReleasedAt,
 				To:   findNextVersionReleasedAt(masters, version.ReleasedAt),
@@ -478,13 +480,10 @@ func validateAttributes(
 		}
 		result.VersionRanges = ranges
 	}
-	if folders, ok, err := validateAndNormalizeAttributeValues(attrs, "name_folder", masters.NameFoldersByCode, compareNameFolders); err != nil {
+	if ids, ok, err := validateAndNormalizeNameFolderCodes(attrs, masters.NameFoldersByCode); err != nil {
 		return nil, nil, err
 	} else if ok {
-		result.NameFolderIDs = make([]int, len(folders))
-		for i, folder := range folders {
-			result.NameFolderIDs[i] = folder.ID
-		}
+		result.NameFolderIDs = ids
 	}
 	canon, err := json.Marshal(attrs)
 	if err != nil {
@@ -493,80 +492,135 @@ func validateAttributes(
 	return canon, result, nil
 }
 
-// validateAndNormalizeAttributeValues はマスタの公開識別子（文字列またはその配列）による絞り込み指定を検証し、
-// マスタの表示順に並べて重複を除いた形へ正規化します。1件だけなら単一値、複数なら配列で保存します。
-// DBの数値IDはAPI契約に含めないため、数値は受け付けません。戻り値は表示順のマスタ項目、キーの有無、検証エラーです。
-func validateAndNormalizeAttributeValues[T any](attrs map[string]json.RawMessage, key string, masters map[string]T, compare func(a, b T) int) ([]T, bool, error) {
+func parseIntOrIntSlice(raw json.RawMessage) ([]int, error) {
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		return nil, err
+	}
+
+	parseInt := func(value float64) (int, error) {
+		if math.Trunc(value) != value {
+			return 0, errors.New("value is not an integer")
+		}
+		parsed := int(value)
+		if float64(parsed) != value {
+			return 0, errors.New("integer value out of range")
+		}
+		return parsed, nil
+	}
+
+	var ids []int
+	switch value := v.(type) {
+	case float64:
+		parsed, err := parseInt(value)
+		if err != nil {
+			return nil, err
+		}
+		ids = []int{parsed}
+	case []any:
+		if len(value) == 0 {
+			return nil, errors.New("empty int slice")
+		}
+		ids = make([]int, 0, len(value))
+		for _, item := range value {
+			floatValue, ok := item.(float64)
+			if !ok {
+				return nil, errors.New("slice contains non-integer value")
+			}
+			parsed, err := parseInt(floatValue)
+			if err != nil {
+				return nil, err
+			}
+			ids = append(ids, parsed)
+		}
+	default:
+		return nil, errors.New("unsupported type for int or int slice")
+	}
+
+	slices.Sort(ids)
+	normalized := slices.Compact(ids)
+	return normalized, nil
+}
+
+func validateAndNormalizeAttributeIDs(attrs map[string]json.RawMessage, key string, isValidID func(int) bool) ([]int, bool, error) {
 	v, ok := attrs[key]
 	if !ok {
 		return nil, false, nil
 	}
 
-	var values []string
-	var single string
-	if err := json.Unmarshal(v, &single); err == nil {
-		values = []string{single}
-	} else if err := json.Unmarshal(v, &values); err != nil || len(values) == 0 {
+	ids, err := parseIntOrIntSlice(v)
+	if err != nil {
 		return nil, false, ErrInvalidGoalAttributes
 	}
-	slices.Sort(values)
-	values = slices.Compact(values)
-
-	type selected struct {
-		value string
-		item  T
+	for _, id := range ids {
+		if !isValidID(id) {
+			return nil, false, ErrInvalidGoalAttributes
+		}
 	}
-	selections := make([]selected, 0, len(values))
-	for _, value := range values {
-		item, exists := masters[value]
+
+	normalized, err := json.Marshal(normalizeIntOrSlice(ids))
+	if err != nil {
+		return nil, false, ErrInvalidGoalAttributes
+	}
+	attrs[key] = normalized
+	return ids, true, nil
+}
+
+// validateAndNormalizeNameFolderCodes は楽曲名順フォルダのコード指定を検証し、表示順に正規化します。
+// 戻り値は絞り込みに使う内部ID、キーの有無、検証エラーです。
+func validateAndNormalizeNameFolderCodes(attrs map[string]json.RawMessage, nameFolders map[string]domainmasterdata.NameFolder) ([]int, bool, error) {
+	v, ok := attrs["name_folder"]
+	if !ok {
+		return nil, false, nil
+	}
+
+	var codes []string
+	var single string
+	if err := json.Unmarshal(v, &single); err == nil {
+		codes = []string{single}
+	} else if err := json.Unmarshal(v, &codes); err != nil || len(codes) == 0 {
+		return nil, false, ErrInvalidGoalAttributes
+	}
+
+	folders := make([]domainmasterdata.NameFolder, 0, len(codes))
+	for _, code := range codes {
+		folder, exists := nameFolders[code]
 		if !exists {
 			return nil, false, ErrInvalidGoalAttributes
 		}
-		selections = append(selections, selected{value: value, item: item})
+		folders = append(folders, folder)
 	}
-	slices.SortFunc(selections, func(a, b selected) int { return compare(a.item, b.item) })
+	slices.SortFunc(folders, func(a, b domainmasterdata.NameFolder) int { return a.SortOrder - b.SortOrder })
+	folders = slices.CompactFunc(folders, func(a, b domainmasterdata.NameFolder) bool { return a.Code == b.Code })
 
-	items := make([]T, len(selections))
-	normalizedValues := make([]string, len(selections))
-	for i, selection := range selections {
-		items[i] = selection.item
-		normalizedValues[i] = selection.value
+	ids := make([]int, 0, len(folders))
+	normalizedCodes := make([]string, 0, len(folders))
+	for _, folder := range folders {
+		ids = append(ids, folder.ID)
+		normalizedCodes = append(normalizedCodes, folder.Code)
 	}
-	var normalized any = normalizedValues
-	if len(normalizedValues) == 1 {
-		normalized = normalizedValues[0]
+	var normalized any = normalizedCodes
+	if len(normalizedCodes) == 1 {
+		normalized = normalizedCodes[0]
 	}
 	encoded, err := json.Marshal(normalized)
 	if err != nil {
 		return nil, false, ErrInvalidGoalAttributes
 	}
-	attrs[key] = encoded
-	return items, true, nil
+	attrs["name_folder"] = encoded
+	return ids, true, nil
 }
 
-// compareDifficulties は難易度をゲームの正規表示順に並べます。
-func compareDifficulties(a, b master.ChartDifficulty) int {
-	return cmp.Or(cmp.Compare(a.SortOrder, b.SortOrder), cmp.Compare(a.ID, b.ID))
-}
-
-// compareGenres はジャンルを表示順に並べます。
-func compareGenres(a, b master.Genre) int {
-	return cmp.Or(cmp.Compare(a.SortOrder, b.SortOrder), cmp.Compare(a.ID, b.ID))
-}
-
-// compareVersions はバージョンを稼働日順に並べます。
-func compareVersions(a, b domainmasterdata.Version) int {
-	return cmp.Or(a.ReleasedAt.Compare(b.ReleasedAt), cmp.Compare(a.ID, b.ID))
-}
-
-// compareNameFolders は楽曲名順フォルダを表示順に並べます。
-func compareNameFolders(a, b domainmasterdata.NameFolder) int {
-	return cmp.Compare(a.SortOrder, b.SortOrder)
+func normalizeIntOrSlice(ids []int) any {
+	if len(ids) == 1 {
+		return ids[0]
+	}
+	return ids
 }
 
 func findNextVersionReleasedAt(masters *domainmasterdata.GoalMasters, releasedAt time.Time) *time.Time {
 	var next *time.Time
-	for _, candidate := range masters.VersionsByDisplayID {
+	for _, candidate := range masters.VersionsByID {
 		if !candidate.ReleasedAt.After(releasedAt) {
 			continue
 		}

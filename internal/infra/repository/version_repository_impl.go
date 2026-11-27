@@ -10,12 +10,8 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/infra/models"
 )
-
-// versionColumns はバージョン取得時の列です。display_id はAPI上の id として返すため必ず含めます。
-const versionColumns = "id, display_id, name, short_name, released_at"
 
 type versionRepository struct{}
 
@@ -26,7 +22,7 @@ func NewVersionRepository() domainrepo.VersionRepository {
 
 func (r *versionRepository) FindAll(ctx context.Context, exec domainrepo.Executor) ([]*entity.Version, error) {
 	rows := []models.VersionModel{}
-	if err := exec.SelectContext(ctx, &rows, `SELECT `+versionColumns+` FROM versions ORDER BY released_at, id`); err != nil {
+	if err := exec.SelectContext(ctx, &rows, `SELECT id, name, short_name, released_at FROM versions ORDER BY released_at, id`); err != nil {
 		return nil, err
 	}
 	versions := make([]*entity.Version, len(rows))
@@ -36,20 +32,20 @@ func (r *versionRepository) FindAll(ctx context.Context, exec domainrepo.Executo
 	return versions, nil
 }
 
-func (r *versionRepository) FindByDisplayID(ctx context.Context, exec domainrepo.Executor, displayID displayid.DisplayID) (*entity.Version, error) {
-	return r.findOne(ctx, exec, `SELECT `+versionColumns+` FROM versions WHERE display_id = ?`, displayID.String())
+func (r *versionRepository) FindByID(ctx context.Context, exec domainrepo.Executor, id int) (*entity.Version, error) {
+	return r.findOne(ctx, exec, `SELECT id, name, short_name, released_at FROM versions WHERE id = ?`, id)
 }
 
-func (r *versionRepository) FindByDisplayIDForUpdate(ctx context.Context, exec domainrepo.Executor, displayID displayid.DisplayID) (*entity.Version, error) {
-	return r.findOne(ctx, exec, `SELECT `+versionColumns+` FROM versions WHERE display_id = ? FOR UPDATE`, displayID.String())
+func (r *versionRepository) FindByIDForUpdate(ctx context.Context, exec domainrepo.Executor, id int) (*entity.Version, error) {
+	return r.findOne(ctx, exec, `SELECT id, name, short_name, released_at FROM versions WHERE id = ? FOR UPDATE`, id)
 }
 
 func (r *versionRepository) FindByName(ctx context.Context, exec domainrepo.Executor, name string) (*entity.Version, error) {
-	return r.findOne(ctx, exec, `SELECT `+versionColumns+` FROM versions WHERE name = ?`, strings.TrimSpace(name))
+	return r.findOne(ctx, exec, `SELECT id, name, short_name, released_at FROM versions WHERE name = ?`, strings.TrimSpace(name))
 }
 
 func (r *versionRepository) FindLatest(ctx context.Context, exec domainrepo.Executor) (*entity.Version, error) {
-	return r.findOne(ctx, exec, `SELECT `+versionColumns+` FROM versions ORDER BY released_at DESC, id DESC LIMIT 1`)
+	return r.findOne(ctx, exec, `SELECT id, name, short_name, released_at FROM versions ORDER BY released_at DESC, id DESC LIMIT 1`)
 }
 
 func (r *versionRepository) findOne(ctx context.Context, exec domainrepo.Executor, query string, args ...any) (*entity.Version, error) {
@@ -82,10 +78,15 @@ func (r *versionRepository) ExistsSongInRange(ctx context.Context, exec domainre
 
 func (r *versionRepository) Create(ctx context.Context, exec domainrepo.Executor, version *entity.Version) (*entity.Version, error) {
 	model := models.FromVersionEntity(version)
-	if _, err := exec.ExecContext(ctx, `INSERT INTO versions (display_id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, model.DisplayID, model.Name, model.ShortName, model.ReleasedAt); err != nil {
+	result, err := exec.ExecContext(ctx, `INSERT INTO versions (name, short_name, released_at) VALUES (?, ?, ?)`, model.Name, model.ShortName, model.ReleasedAt)
+	if err != nil {
 		return nil, wrapVersionDuplicateError(err)
 	}
-	return r.FindByDisplayID(ctx, exec, version.DisplayID)
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+	return r.FindByID(ctx, exec, int(id))
 }
 
 func (r *versionRepository) Save(ctx context.Context, exec domainrepo.Executor, version *entity.Version) error {

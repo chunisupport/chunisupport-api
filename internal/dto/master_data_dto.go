@@ -7,14 +7,14 @@ import (
 )
 
 // MasterItemDTO はマスタデータの単一項目を表します。
-// DBの数値IDは公開せず、一意な名前を識別子として返します。
 type MasterItemDTO struct {
+	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
 
 // GenreDTO はジャンルマスタを表します。
-// DBの数値IDは公開せず、一意な名前を識別子として返します。
 type GenreDTO struct {
+	ID        int    `json:"id"`
 	Name      string `json:"name"`
 	ShortName string `json:"short_name"`
 }
@@ -23,7 +23,7 @@ type GenreDTO struct {
 func ToGenreDTOs(genres []masterdata.Genre) []*GenreDTO {
 	dtos := make([]*GenreDTO, len(genres))
 	for i, g := range genres {
-		dtos[i] = &GenreDTO{Name: g.Name, ShortName: g.ShortName}
+		dtos[i] = &GenreDTO{ID: g.ID, Name: g.Name, ShortName: g.ShortName}
 	}
 	return dtos
 }
@@ -34,9 +34,8 @@ type GenresResponse struct {
 }
 
 // VersionDTO はバージョンマスタを表します。
-// バージョンは改名されるため、id にはDBの数値主キーではなく公開ID（display_id）を返します。
 type VersionDTO struct {
-	ID         string `json:"id"`
+	ID         int    `json:"id"`
 	Name       string `json:"name"`
 	ShortName  string `json:"short_name"`
 	ReleasedAt string `json:"released_at"`
@@ -47,7 +46,7 @@ func ToVersionDTOs(versions []masterdata.Version) []*VersionDTO {
 	dtos := make([]*VersionDTO, len(versions))
 	for i, v := range versions {
 		dtos[i] = &VersionDTO{
-			ID:         v.DisplayID,
+			ID:         int(v.ID),
 			Name:       v.Name,
 			ShortName:  v.ShortName,
 			ReleasedAt: v.ReleasedAt.Format(time.DateOnly),
@@ -106,8 +105,8 @@ type MasterDataResponse struct {
 }
 
 // RatingBandDTO はレーティング帯マスタのDTOです。
-// DBの数値IDは公開せず、一意なラベルを識別子として返します。
 type RatingBandDTO struct {
+	ID           int      `json:"id"`
 	Label        string   `json:"label"`
 	MinInclusive *float64 `json:"min_inclusive"`
 	MaxExclusive *float64 `json:"max_exclusive"`

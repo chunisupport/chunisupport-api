@@ -2,7 +2,6 @@ package masterdata
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -227,13 +226,9 @@ func TestPreload_ジャンルとバージョンの超ショート名を読み込
 	require.NotNil(t, masterDataMasters)
 	assert.Equal(t, "P&A", masterDataMasters.Genres["POPS&ANIME"].ShortName)
 	assert.Equal(t, "VRS", masterDataMasters.Versions[1].ShortName)
-	assert.Equal(t, "0000000000000001", masterDataMasters.Versions[1].DisplayID)
 	goalMasters := cache.GoalMasters()
 	require.NotNil(t, goalMasters)
-	assert.Equal(t, "VRS", goalMasters.VersionsByDisplayID["0000000000000001"].ShortName)
-	// 目標の難易度・ジャンルは名称で引く。
-	assert.Equal(t, 1, goalMasters.Difficulties["MASTER"].ID)
-	assert.Equal(t, 1, goalMasters.Genres["POPS&ANIME"].ID)
+	assert.Equal(t, "VRS", goalMasters.VersionsByID[1].ShortName)
 }
 
 func setupPreloadSQLite(t *testing.T) *sqlx.DB {
@@ -258,7 +253,7 @@ func setupPreloadSQLite(t *testing.T) *sqlx.DB {
 		`CREATE TABLE difficulties (id INTEGER PRIMARY KEY, name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
 		`CREATE TABLE genres (id INTEGER PRIMARY KEY, name TEXT NOT NULL, short_name TEXT NOT NULL, sort_order INTEGER NOT NULL)`,
 		`CREATE TABLE account_types (id INTEGER PRIMARY KEY, name TEXT NOT NULL)`,
-		`CREATE TABLE versions (id INTEGER PRIMARY KEY, display_id TEXT NOT NULL, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`,
+		`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`,
 		`CREATE TABLE achievement_types (id INTEGER PRIMARY KEY, code TEXT NOT NULL)`,
 	}
 
@@ -290,7 +285,7 @@ func insertPreloadMasterRows(t *testing.T, db *sqlx.DB, achievementTypeID int, a
 		{query: `INSERT INTO difficulties (id, name, sort_order) VALUES (?, ?, ?)`, args: []any{1, "MASTER", 1}},
 		{query: `INSERT INTO genres (id, name, short_name, sort_order) VALUES (?, ?, ?, ?)`, args: []any{1, "POPS&ANIME", "P&A", 1}},
 		{query: `INSERT INTO account_types (id, name) VALUES (?, ?)`, args: []any{1, "PLAYER"}},
-		{query: `INSERT INTO versions (id, display_id, name, short_name, released_at) VALUES (?, ?, ?, ?, ?)`, args: []any{1, "0000000000000001", "VERSE", "VRS", releasedAt}},
+		{query: `INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, args: []any{1, "VERSE", "VRS", releasedAt}},
 		{query: `INSERT INTO achievement_types (id, code) VALUES (?, ?)`, args: []any{achievementTypeID, achievementCode}},
 	}
 
@@ -344,12 +339,12 @@ func TestPreload_ExcludesFutureVersions(t *testing.T) {
 	// GoalMasters でも未リリース版が除外されていることを確認
 	goalMasters := cache.GoalMasters()
 	require.NotNil(t, goalMasters)
-	_, goalPastOK := goalMasters.VersionsByDisplayID["0000000000000001"]
-	assert.True(t, goalPastOK, "過去版は GoalMasters.VersionsByDisplayID に含まれるべき")
-	_, goalTodayOK := goalMasters.VersionsByDisplayID["0000000000000002"]
-	assert.True(t, goalTodayOK, "当日版は GoalMasters.VersionsByDisplayID に含まれるべき")
-	_, goalFutureOK := goalMasters.VersionsByDisplayID["0000000000000003"]
-	assert.False(t, goalFutureOK, "未リリース版は GoalMasters.VersionsByDisplayID に含まれるべき")
+	_, goalPastOK := goalMasters.VersionsByID[1]
+	assert.True(t, goalPastOK, "過去版は GoalMasters.VersionsByID に含まれるべき")
+	_, goalTodayOK := goalMasters.VersionsByID[2]
+	assert.True(t, goalTodayOK, "当日版は GoalMasters.VersionsByID に含まれるべき")
+	_, goalFutureOK := goalMasters.VersionsByID[3]
+	assert.False(t, goalFutureOK, "未リリース版は GoalMasters.VersionsByID に含まれるべき")
 }
 
 func TestCache_PublicVersionsByID_稼働日のJST7時で未来版を切り替える(t *testing.T) {
@@ -392,9 +387,9 @@ func TestCache_PublicVersionsByID_古い状態ならDBから再読込する(t *t
 	db, err := sqlx.Open("sqlite", ":memory:")
 	require.NoError(t, err)
 	db.SetMaxOpenConns(1)
-	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, display_id TEXT NOT NULL, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`)
+	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO versions (id, display_id, name, short_name, released_at) VALUES (?, ?, ?, ?, ?)`, 1, fmt.Sprintf("%016x", 1), "CHUNITHM VERSE", "VRS", time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
+	_, err = db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, 1, "CHUNITHM VERSE", "VRS", time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC))
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	cache := &Cache{db: db, now: time.Now, allVersions: map[string]Version{}, allVersionsByID: map[int]Version{}, versionsStale: true}
@@ -421,9 +416,9 @@ func TestCache_PublicVersionsByID_stale再読込失敗時は旧値を保持し�
 	require.NoError(t, err)
 	db.SetMaxOpenConns(1)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, display_id TEXT NOT NULL, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`)
+	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO versions (id, display_id, name, short_name, released_at) VALUES (?, ?, ?, ?, ?)`, 1, fmt.Sprintf("%016x", 1), "CHUNITHM VERSE", "VRS", releasedOld)
+	_, err = db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, 1, "CHUNITHM VERSE", "VRS", releasedOld)
 	require.NoError(t, err)
 	oldVersion := Version{ID: 1, Name: "CHUNITHM VERSE", ShortName: "VRS", ReleasedAt: releasedOld}
 	cache := &Cache{
@@ -453,11 +448,11 @@ func TestCache_PublicVersionsByID_stale再読込失敗時は旧値を保持し�
 	assert.Len(t, failed, 1)
 
 	// When: DBを復旧して新版ID2を追加し、次回参照で再読込させる。
-	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, display_id TEXT NOT NULL, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`)
+	_, err = db.Exec(`CREATE TABLE versions (id INTEGER PRIMARY KEY, name TEXT NOT NULL, short_name TEXT NOT NULL, released_at DATE NOT NULL)`)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO versions (id, display_id, name, short_name, released_at) VALUES (?, ?, ?, ?, ?)`, 1, fmt.Sprintf("%016x", 1), "CHUNITHM VERSE", "VRS", releasedOld)
+	_, err = db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, 1, "CHUNITHM VERSE", "VRS", releasedOld)
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO versions (id, display_id, name, short_name, released_at) VALUES (?, ?, ?, ?, ?)`, 2, fmt.Sprintf("%016x", 2), "CHUNITHM NEW", "NEW", releasedNew)
+	_, err = db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, 2, "CHUNITHM NEW", "NEW", releasedNew)
 	require.NoError(t, err)
 	recovered := cache.PublicVersionsByID()
 
@@ -509,7 +504,7 @@ func insertVersionRows(t *testing.T, db *sqlx.DB, pastDate, today, futureDate ti
 	}
 
 	for _, v := range versionStatements {
-		_, err := db.Exec(`INSERT INTO versions (id, display_id, name, short_name, released_at) VALUES (?, ?, ?, ?, ?)`, v.id, fmt.Sprintf("%016x", v.id), v.name, v.name, v.releasedAt)
+		_, err := db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES (?, ?, ?, ?)`, v.id, v.name, v.name, v.releasedAt)
 		require.NoError(t, err)
 	}
 }

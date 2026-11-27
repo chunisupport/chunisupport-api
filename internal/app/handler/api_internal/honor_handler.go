@@ -1,12 +1,11 @@
 package api_internal
 
 import (
-	"errors"
 	"net/http"
+	"strconv"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -33,7 +32,7 @@ func (h *HonorHandler) ListHonors(c *echo.Context) error {
 	})
 }
 
-// GetHonor は指定した公開IDの称号を返却します。
+// GetHonor は指定IDの称号を返却します。
 func (h *HonorHandler) GetHonor(c *echo.Context) error {
 	id, err := parseHonorID(c.Param("id"))
 	if err != nil {
@@ -107,12 +106,10 @@ func (h *HonorHandler) DeleteHonor(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-// parseHonorID はパスの称号IDを公開ID（display_id）として検証します。
-// DBの数値主キーは受け付けません。
-func parseHonorID(raw string) (displayid.DisplayID, error) {
-	id, err := displayid.NewDisplayID(raw)
-	if err != nil {
-		return "", errors.Join(usecase.ErrInvalidHonorInput, err)
+func parseHonorID(raw string) (int, error) {
+	id, err := strconv.Atoi(raw)
+	if err != nil || id <= 0 {
+		return 0, usecase.ErrInvalidHonorInput
 	}
 	return id, nil
 }

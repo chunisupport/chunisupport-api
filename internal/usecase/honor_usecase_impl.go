@@ -7,7 +7,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 )
 
 type honorUsecaseImpl struct {
@@ -32,21 +31,17 @@ func (u *honorUsecaseImpl) ListHonors(ctx context.Context) ([]*entity.Honor, err
 	return u.honorRepo.FindAll(ctx, u.defaultExecutor)
 }
 
-// GetHonor は指定した公開IDの称号を取得します。
-func (u *honorUsecaseImpl) GetHonor(ctx context.Context, id displayid.DisplayID) (*entity.Honor, error) {
-	if !id.IsValid() {
-		return nil, fmt.Errorf("%w: invalid id", ErrInvalidHonorInput)
+// GetHonor は指定IDの称号を取得します。
+func (u *honorUsecaseImpl) GetHonor(ctx context.Context, id int) (*entity.Honor, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidHonorInput)
 	}
-	return u.honorRepo.FindByDisplayID(ctx, u.defaultExecutor, id)
+	return u.honorRepo.FindByID(ctx, u.defaultExecutor, id)
 }
 
 // CreateHonor は称号を新規登録します。
 func (u *honorUsecaseImpl) CreateHonor(ctx context.Context, input HonorInput) (*entity.Honor, error) {
-	displayID, err := displayid.Generate()
-	if err != nil {
-		return nil, err
-	}
-	honor, err := u.buildHonor(displayID, input)
+	honor, err := u.buildHonor(input)
 	if err != nil {
 		return nil, err
 	}
@@ -66,19 +61,19 @@ func (u *honorUsecaseImpl) CreateHonor(ctx context.Context, input HonorInput) (*
 }
 
 // UpdateHonor は称号を更新します。
-func (u *honorUsecaseImpl) UpdateHonor(ctx context.Context, id displayid.DisplayID, input HonorInput) (*entity.Honor, error) {
-	if !id.IsValid() {
-		return nil, fmt.Errorf("%w: invalid id", ErrInvalidHonorInput)
+func (u *honorUsecaseImpl) UpdateHonor(ctx context.Context, id int, input HonorInput) (*entity.Honor, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("%w: id must be positive", ErrInvalidHonorInput)
 	}
 
-	newHonor, err := u.buildHonor(id, input)
+	newHonor, err := u.buildHonor(input)
 	if err != nil {
 		return nil, err
 	}
 
 	var updated *entity.Honor
 	if err := u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		current, err := u.honorRepo.FindByDisplayID(ctx, tx, id)
+		current, err := u.honorRepo.FindByID(ctx, tx, id)
 		if err != nil {
 			return err
 		}
@@ -89,7 +84,7 @@ func (u *honorUsecaseImpl) UpdateHonor(ctx context.Context, id displayid.Display
 		if err := u.honorRepo.Save(ctx, tx, current); err != nil {
 			return err
 		}
-		updated, err = u.honorRepo.FindByDisplayID(ctx, tx, id)
+		updated, err = u.honorRepo.FindByID(ctx, tx, id)
 		return err
 	}); err != nil {
 		return nil, err
@@ -98,16 +93,16 @@ func (u *honorUsecaseImpl) UpdateHonor(ctx context.Context, id displayid.Display
 }
 
 // DeleteHonor は称号を物理削除します。
-func (u *honorUsecaseImpl) DeleteHonor(ctx context.Context, id displayid.DisplayID) error {
-	if !id.IsValid() {
-		return fmt.Errorf("%w: invalid id", ErrInvalidHonorInput)
+func (u *honorUsecaseImpl) DeleteHonor(ctx context.Context, id int) error {
+	if id <= 0 {
+		return fmt.Errorf("%w: id must be positive", ErrInvalidHonorInput)
 	}
 	return u.tm.Transactional(ctx, func(tx repository.Executor) error {
-		return u.honorRepo.DeleteByDisplayID(ctx, tx, id)
+		return u.honorRepo.Delete(ctx, tx, id)
 	})
 }
 
-func (u *honorUsecaseImpl) buildHonor(displayID displayid.DisplayID, input HonorInput) (*entity.Honor, error) {
+func (u *honorUsecaseImpl) buildHonor(input HonorInput) (*entity.Honor, error) {
 	name := strings.TrimSpace(input.Name)
 	typeName := strings.TrimSpace(input.TypeName)
 	imageURL := strings.TrimSpace(input.ImageURL)
@@ -127,5 +122,5 @@ func (u *honorUsecaseImpl) buildHonor(displayID displayid.DisplayID, input Honor
 		return nil, fmt.Errorf("%w: unknown type_name=%s", ErrInvalidHonorInput, typeName)
 	}
 
-	return entity.NewHonor(displayID, name, honorType.ID, honorType.Name, imageURL), nil
+	return entity.NewHonor(name, honorType.ID, honorType.Name, imageURL), nil
 }
