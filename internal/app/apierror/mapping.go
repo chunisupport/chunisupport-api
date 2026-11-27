@@ -120,6 +120,10 @@ func FromUsecaseError(err error) *APIError {
 		return ErrNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrHonorConflict):
 		return ErrConflict.WithInternal(err)
+	case errors.Is(err, repository.ErrAppAnnouncementNotFound):
+		return ErrNotFound.WithInternal(err)
+	case errors.Is(err, usecase.ErrInvalidAppAnnouncementInput):
+		return ErrValidationFailed.WithInternal(err)
 	case errors.Is(err, repository.ErrVersionNotFound):
 		return ErrVersionNotFound.WithInternal(err)
 	case errors.Is(err, repository.ErrVersionConflict):

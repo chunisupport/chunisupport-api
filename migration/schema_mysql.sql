@@ -29,6 +29,21 @@ CREATE TABLE `api_tokens` (
   CONSTRAINT `chk_api_tokens_permission` CHECK ((`permission` in (_utf8mb4'read',_utf8mb4'read_write'))),
   CONSTRAINT `api_tokens_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE `app_announcements` (
+  `id` char(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `kind` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `title` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `body` text COLLATE utf8mb4_unicode_ci,
+  `target_url` varchar(2048) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `starts_at` datetime NOT NULL,
+  `expires_at` datetime NOT NULL,
+  `revision` tinyint unsigned NOT NULL DEFAULT '1',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_app_announcements_expires_at` (`expires_at`),
+  CONSTRAINT `chk_app_announcements_period` CHECK ((`starts_at` < `expires_at`)),
+  CONSTRAINT `chk_app_announcements_revision` CHECK ((`revision` >= 1))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `chart_best_slot_stats_by_rating_band` (
   `chart_id` mediumint unsigned NOT NULL,
   `rating_band_id` tinyint unsigned NOT NULL,

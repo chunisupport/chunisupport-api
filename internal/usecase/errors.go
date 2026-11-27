@@ -12,6 +12,8 @@ var (
 	ErrInvalidVersionInput          = errors.New("invalid version input")
 	ErrVersionNotLatest             = errors.New("version not latest")
 	ErrVersionInUse                 = errors.New("version in use")
+	// ErrInvalidAppAnnouncementInput は管理画面から登録するお知らせの内容が不正な場合に返します。
+	ErrInvalidAppAnnouncementInput = errors.New("invalid app announcement input")
 
 	ErrAdminRequired = errors.New("admin permission required")
 	// ErrInvalidUserListPage はユーザー一覧の page から計算する OFFSET が int に収まらない場合に返します。

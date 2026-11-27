@@ -18,6 +18,7 @@
 - [楽曲データ収集バッチ](docs/song_batch.md)
 - [譜面統計バッチ](docs/chart_stats_batch.md)
 - [譜面統計バッチの集計仕様](docs/chart_statistics_aggregation.md)
+- [期間限定のお知らせの登録手順](docs/app_announcements.md)
 - [アーキテクチャ概要](ARCHITECTURE.md)
 - [logrotate設定手順](docs/logrotate.md)
 - [サーバー新設手順](docs/server_setup.md)
