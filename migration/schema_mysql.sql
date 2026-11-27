@@ -304,6 +304,7 @@ CREATE TABLE `honor_types` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `honors` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `display_id` char(16) COLLATE utf8mb4_unicode_ci NOT NULL,
   `name` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
   `honor_type_id` tinyint unsigned NOT NULL,
   `image_url` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -311,6 +312,7 @@ CREATE TABLE `honors` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `unique_honor_name_type` (`name`,`honor_type_id`),
   UNIQUE KEY `unique_honor_image_url` (`image_url`),
+  UNIQUE KEY `uq_honors_display_id` (`display_id`),
   KEY `honor_type_id` (`honor_type_id`),
   CONSTRAINT `honors_ibfk_1` FOREIGN KEY (`honor_type_id`) REFERENCES `honor_types` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -664,12 +666,14 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `versions` (
   `id` tinyint unsigned NOT NULL AUTO_INCREMENT,
+  `display_id` char(16) COLLATE utf8mb4_unicode_ci NOT NULL,
   `name` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
   `short_name` varchar(10) COLLATE utf8mb4_unicode_ci NOT NULL,
   `released_at` date NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`),
-  UNIQUE KEY `uq_versions_short_name` (`short_name`)
+  UNIQUE KEY `uq_versions_short_name` (`short_name`),
+  UNIQUE KEY `uq_versions_display_id` (`display_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 CREATE TABLE `worldsend_chart_score_percentiles` (
   `worldsend_chart_id` mediumint unsigned NOT NULL,

@@ -11,6 +11,7 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v5"
@@ -31,14 +32,17 @@ type mockHonorUsecase struct {
 	deleteErr    error
 	createCalled bool
 	deleteCalled bool
+	getCalled    bool
+	updateCalled bool
 }
 
 func (m *mockHonorUsecase) ListHonors(context.Context) ([]*entity.Honor, error) {
 	return []*entity.Honor{}, nil
 }
 
-func (m *mockHonorUsecase) GetHonor(context.Context, int) (*entity.Honor, error) {
-	return &entity.Honor{ID: 1, Name: "称号A", TypeName: "gold"}, nil
+func (m *mockHonorUsecase) GetHonor(context.Context, displayid.DisplayID) (*entity.Honor, error) {
+	m.getCalled = true
+	return &entity.Honor{ID: 1, DisplayID: "0123456789abcdef", Name: "称号A", TypeName: "gold"}, nil
 }
 
 func (m *mockHonorUsecase) CreateHonor(context.Context, usecase.HonorInput) (*entity.Honor, error) {
@@ -46,14 +50,15 @@ func (m *mockHonorUsecase) CreateHonor(context.Context, usecase.HonorInput) (*en
 	if m.createErr != nil {
 		return nil, m.createErr
 	}
-	return &entity.Honor{ID: 1, Name: "称号A", TypeName: "gold"}, nil
+	return &entity.Honor{ID: 1, DisplayID: "0123456789abcdef", Name: "称号A", TypeName: "gold"}, nil
 }
 
-func (m *mockHonorUsecase) UpdateHonor(context.Context, int, usecase.HonorInput) (*entity.Honor, error) {
-	return &entity.Honor{ID: 1, Name: "称号A", TypeName: "gold"}, nil
+func (m *mockHonorUsecase) UpdateHonor(context.Context, displayid.DisplayID, usecase.HonorInput) (*entity.Honor, error) {
+	m.updateCalled = true
+	return &entity.Honor{ID: 1, DisplayID: "0123456789abcdef", Name: "称号A", TypeName: "gold"}, nil
 }
 
-func (m *mockHonorUsecase) DeleteHonor(context.Context, int) error {
+func (m *mockHonorUsecase) DeleteHonor(context.Context, displayid.DisplayID) error {
 	m.deleteCalled = true
 	return m.deleteErr
 }
@@ -161,10 +166,10 @@ func TestHonorHandler_UpdateHonor_不正JSONは400(t *testing.T) {
 	e := newHonorHandlerTestEcho()
 	uc := &mockHonorUsecase{}
 	handler := NewHonorHandler(uc)
-	req := httptest.NewRequest(http.MethodPut, "/internal/honors/1", bytes.NewBufferString(`{"name":"称号A","type_name":"gold","unknown":1}`))
+	req := httptest.NewRequest(http.MethodPut, "/internal/honors/0123456789abcdef", bytes.NewBufferString(`{"name":"称号A","type_name":"gold","unknown":1}`))
 	req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	c := e.NewContext(req, httptest.NewRecorder())
-	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "0123456789abcdef"}})
 
 	err := handler.UpdateHonor(c)
 
@@ -176,10 +181,10 @@ func TestHonorHandler_DeleteHonor_参照中はConflictを返す(t *testing.T) {
 	e := newHonorHandlerTestEcho()
 	uc := &mockHonorUsecase{deleteErr: repository.ErrHonorConflict}
 	handler := NewHonorHandler(uc)
-	req := httptest.NewRequest(http.MethodDelete, "/internal/honors/1", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/internal/honors/0123456789abcdef", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "0123456789abcdef"}})
 
 	// When
 	err := handler.DeleteHonor(c)
@@ -187,4 +192,56 @@ func TestHonorHandler_DeleteHonor_参照中はConflictを返す(t *testing.T) {
 	// Then
 	assertHonorHandlerAPIError(t, err, apierror.CodeConflict)
 	assert.True(t, uc.deleteCalled)
+}
+
+func TestHonorHandler_GetHonor_公開IDを返しDBの数値IDを含めない(t *testing.T) {
+	// Given
+	e := newHonorHandlerTestEcho()
+	handler := NewHonorHandler(&mockHonorUsecase{})
+	rec := httptest.NewRecorder()
+	c := e.NewContext(httptest.NewRequest(http.MethodGet, "/internal/honors/0123456789abcdef", nil), rec)
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "0123456789abcdef"}})
+
+	// When
+	err := handler.GetHonor(c)
+
+	// Then
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.JSONEq(t, `{"id":"0123456789abcdef","name":"称号A","type_name":"gold","image_url":"","created_at":null}`, rec.Body.String())
+}
+
+func TestHonorHandler_DBの数値主キーはUsecaseを呼ばずValidationFailedを返す(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		body   string
+		call   func(*HonorHandler, *echo.Context) error
+	}{
+		{name: "取得", method: http.MethodGet, call: (*HonorHandler).GetHonor},
+		{name: "更新", method: http.MethodPut, body: `{"name":"称号A","type_name":"gold"}`, call: (*HonorHandler).UpdateHonor},
+		{name: "削除", method: http.MethodDelete, call: (*HonorHandler).DeleteHonor},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Given
+			e := newHonorHandlerTestEcho()
+			uc := &mockHonorUsecase{}
+			handler := NewHonorHandler(uc)
+			req := httptest.NewRequest(tt.method, "/internal/honors/1", bytes.NewBufferString(tt.body))
+			req.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+			c := e.NewContext(req, httptest.NewRecorder())
+			c.SetPathValues(echo.PathValues{{Name: "id", Value: "1"}})
+
+			// When
+			err := tt.call(handler, c)
+
+			// Then
+			assertHonorHandlerAPIError(t, err, apierror.CodeValidationFailed)
+			assert.False(t, uc.getCalled)
+			assert.False(t, uc.updateCalled)
+			assert.False(t, uc.deleteCalled)
+		})
+	}
 }

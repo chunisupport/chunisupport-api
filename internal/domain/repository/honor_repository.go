@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 )
 
 // HonorAssignment はプレイヤーに称号を割り当てるための構造体です。
@@ -24,8 +25,8 @@ type HonorRepository interface {
 	// FindAll は称号をID昇順で全件取得します。
 	FindAll(ctx context.Context, exec Executor) ([]*entity.Honor, error)
 
-	// FindByID は指定IDの称号を取得します。
-	FindByID(ctx context.Context, exec Executor, id int) (*entity.Honor, error)
+	// FindByDisplayID は指定した公開IDの称号を取得します。
+	FindByDisplayID(ctx context.Context, exec Executor, displayID displayid.DisplayID) (*entity.Honor, error)
 
 	// Create は称号を新規登録します。
 	Create(ctx context.Context, exec Executor, honor *entity.Honor) (*entity.Honor, error)
@@ -33,11 +34,11 @@ type HonorRepository interface {
 	// Save は称号を更新します。
 	Save(ctx context.Context, exec Executor, honor *entity.Honor) error
 
-	// Delete は称号を物理削除します。
-	Delete(ctx context.Context, exec Executor, id int) error
+	// DeleteByDisplayID は指定した公開IDの称号を物理削除します。
+	DeleteByDisplayID(ctx context.Context, exec Executor, displayID displayid.DisplayID) error
 
 	// EnsureHonor は称号を登録または既存のIDを取得します。
-	// 称号が存在しなければ登録され、存在すれば既存のIDが返されます。
+	// 称号が存在しなければ公開IDを採番して登録され、存在すれば既存のIDが返されます。
 	// imageURL がnilの場合はNULLとして保存します。
 	// ImageURLRegistered は、imageURL付き称号をこの呼び出しで新規登録した場合のみtrueです。
 	EnsureHonor(ctx context.Context, exec Executor, title string, honorTypeID int, imageURL *string) (HonorEnsureResult, error)

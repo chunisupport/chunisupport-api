@@ -202,10 +202,10 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - `slots`: スロット種別マスタ（none、best、best_candidate、new、new_candidate）。
 - `honor_types`: 称号種類マスタ（normal、copper、silver、gold、platina、rainbow、staff、ongeki、maimai、ultima、sp、phoenix_g、phoenix_p、phoenix_r、expert、master）。
 - `account_types`: アカウント種別マスタ（PLAYER、EDITOR、ADMIN、EXTDEV）。
-- `versions`: バージョンマスタ。CHUNITHMの各バージョン（無印からMateまで）の情報とリリース日を格納。`short_name` に3〜4文字の略記（ORI、CRY+、PAR×、XVSX、MATなど）を一意に保持。
+- `versions`: バージョンマスタ。CHUNITHMの各バージョン（無印からMateまで）の情報とリリース日を格納。`short_name` に3〜4文字の略記（ORI、CRY+、PAR×、XVSX、MATなど）を一意に保持。`display_id` はAPI上の `id` として使う16文字の小文字16進数（一意制約）で、数値の `id` は内部の参照専用。
 
 #### ゲームコンテンツマスタ
-- `honors`: 称号マスタ。称号名、称号種別、画像URL等を格納。
+- `honors`: 称号マスタ。称号名、称号種別、画像URL等を格納。`display_id` はAPI上の `id` として使う16文字の小文字16進数（一意制約）で、数値の `id` は内部の参照専用。
 
 ---
 
@@ -252,6 +252,7 @@ go install -tags mysql github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 - **000067**: `api_tokens` に表示用ID `display_id` を追加し、既存行へ採番する。新しいAPIは発行時にこの列へ書き込み、名前変更・削除でこの値を `id` として受け取るため、バイナリより先に適用する。MySQLのDDLは暗黙コミットされ、列追加から `NOT NULL` 化までの間に旧バイナリが発行したトークンは `display_id` がNULLのまま残り最後の `NOT NULL` 化が失敗し得るため、適用開始から完了までAPIトークンの発行を停止する。適用後から新バイナリへ切り替えるまでの間、旧バイナリでのAPIトークン発行は `display_id` 未指定のため失敗する。
 - **000068**: `api_tokens` に公開ユーザーのみ参照する設定 `public_only`（既定値 `FALSE`）を追加する。新しいAPIは発行時にこの列へ書き込み、認証時に読み込むため、バイナリより先に適用する。既定値があるため旧バイナリはそのまま動作する。
 - **000069**: `player_course_records` と `player_course_record_histories` の `course_id` 外部キー制約を `ON DELETE CASCADE` に変更し、コースを物理削除した際に紐づくスコアとスコア履歴も連鎖削除されるようにする。アプリ本体の削除処理（論理削除）は変更しないため、稼働中のバイナリとの互換性を保ったまま適用できる。適用中は対象テーブルへのメタデータロック取得によりコース記録の読み書きが一時待機する場合がある。downは `ON DELETE` 指定なしの制約へ戻すが、物理削除で失われたデータは復元されない。
+- **000074**: `versions` と `honors` に公開ID `display_id` を追加し、既存行へ採番する。新しいAPIはバージョン・称号の登録時にこの列へ書き込み、管理API（`/internal/admin/versions`・`/internal/honors`）でこの値を `id` として返し・受け取るため、バイナリより先に適用する。列追加から `NOT NULL` 化までの間に旧バイナリが登録した行は `display_id` がNULLのまま残り最後の `NOT NULL` 化が失敗し得るため、適用開始から完了までバージョン・称号の登録とプレイヤーデータ登録を停止する。適用後から新バイナリへ切り替えるまでの間、旧バイナリでのバージョン・称号の登録（プレイヤーデータ登録での新規称号を含む）は `display_id` 未指定のため失敗する。管理画面は公開IDを使う新フロントと同時にリリースする。
 
 #### 000045のロールバック前確認
 

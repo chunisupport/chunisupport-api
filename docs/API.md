@@ -579,7 +579,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 ### バージョン管理 `/internal/admin/versions`
 
 - **認証**: Firebase Bearer（ADMINのみ）
-- **GET**: 未来版を含む全件を `released_at` 昇順、同日はID昇順で返します。レスポンスは管理者向け `VersionDTO` の配列です。
+- **GET**: 未来版を含む全件を `released_at` 昇順（同日は登録順）で返します。レスポンスは管理者向け `VersionDTO` の配列です。
 - **POST**: バージョンを追加し、201 Createdで作成した管理者向け `VersionDTO` を返します。未来日を指定できます。
 
 ```json
@@ -596,7 +596,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `id` | int | バージョンID |
+| `id` | string | バージョンの公開ID（16文字の小文字16進数）。DBの数値主キーではありません |
 | `name` | string | バージョン名称 |
 | `short_name` | string | 超ショート名 |
 | `released_at` | string | リリース日（`YYYY-MM-DD`） |
@@ -604,6 +604,7 @@ Shields.io側のキャッシュにより、指標・ポゼッションの更新�
 ### バージョン改名・削除 `/internal/admin/versions/:id`
 
 - **認証**: Firebase Bearer（ADMINのみ）
+- **パスパラメータ**: `id` - 管理者向け `VersionDTO` の `id`（公開ID）。数値は受け付けず `validation_failed`（400）を返します。
 - **PUT**: `{"name":"CHUNITHM VERSE","short_name":"VRS"}` の形式で名前と超ショート名を変更し、200 OKで変更後の管理者向け `VersionDTO` を返します。`name`・`short_name` とも必須で、制約は作成時と同じです。`released_at` を含む要求は拒否します。
 - **DELETE**: 対象が最新版で、そのリリース日以降にリリースされた曲が1件もない場合だけ物理削除し、204 No Contentを返します。`songs.is_deleted` にかかわらず曲ありと判定し、`songs.released_at IS NULL` は対象外です。
 
@@ -4951,14 +4952,14 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/honors`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **概要**: 称号マスタをID昇順で全件取得します。
+- **概要**: 称号マスタを登録順で全件取得します。
 - **レスポンス**: 200 OK
 
 ```json
 {
   "honors": [
     {
-      "id": 1,
+      "id": "0123456789abcdef",
       "name": "称号名",
       "type_name": "gold",
       "image_url": "https://example.com/honor.png",
@@ -4971,8 +4972,8 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### GET `/internal/honors/:id`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **パスパラメータ**: `id` - 称号ID
-- **概要**: 指定IDの称号を取得します。
+- **パスパラメータ**: `id` - `HonorDTO` の `id`（公開ID）。数値は受け付けず `validation_failed`（422）を返します。
+- **概要**: 指定した公開IDの称号を取得します。
 - **レスポンス**: 200 OK (`HonorDTO`)
 
 ### POST `/internal/honors`
@@ -4994,23 +4995,23 @@ BASIC・ADVANCED・EXPERT・MASTERがすべて存在する通常楽曲を対象�
 ### PUT `/internal/honors/:id`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **パスパラメータ**: `id` - 称号ID
-- **概要**: 指定IDの称号を更新します。`type_name` は `GET /internal/master/honor-types` の `name` を指定します。
+- **パスパラメータ**: `id` - `HonorDTO` の `id`（公開ID）。数値は受け付けず `validation_failed`（422）を返します。
+- **概要**: 指定した公開IDの称号を更新します。`type_name` は `GET /internal/master/honor-types` の `name` を指定します。
 - **リクエストボディ**: `POST /internal/honors` と同一
 - **レスポンス**: 200 OK (`HonorDTO`)
 
 ### DELETE `/internal/honors/:id`
 - **認証**: Firebase Bearer 必須
 - **権限**: ADMIN 権限が必要
-- **パスパラメータ**: `id` - 称号ID
-- **概要**: 指定IDの称号を物理削除します。プレイヤーに割り当て済みの称号は削除できません。
+- **パスパラメータ**: `id` - `HonorDTO` の `id`（公開ID）。数値は受け付けず `validation_failed`（422）を返します。
+- **概要**: 指定した公開IDの称号を物理削除します。プレイヤーに割り当て済みの称号は削除できません。
 - **レスポンス**: 204 No Content
 
 **HonorDTO**:
 
 | フィールド | 型 | 説明 |
 | ---------- | -- | ---- |
-| `id` | int | 称号ID |
+| `id` | string | 称号の公開ID（16文字の小文字16進数）。DBの数値主キーではありません |
 | `name` | string | 称号名 |
 | `type_name` | string | 称号タイプ名 |
 | `image_url` | string | 称号画像URL。未設定時は空文字 |

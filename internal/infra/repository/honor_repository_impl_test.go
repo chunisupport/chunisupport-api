@@ -9,6 +9,7 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/go-sql-driver/mysql"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,10 +80,10 @@ func TestEnsureHonor_SP称号は画像URLの重複を事前確認して新規登
 	assert.Equal(t, 10, result.ID)
 	assert.True(t, result.ImageURLRegistered)
 	assert.True(t, exec.getCalled)
-	assert.Contains(t, exec.query, "INSERT INTO honors (name, honor_type_id, image_url)")
+	assert.Contains(t, exec.query, "INSERT INTO honors (display_id, name, honor_type_id, image_url)")
 	assert.NotContains(t, exec.query, "ON DUPLICATE KEY UPDATE")
 	assert.NotContains(t, exec.query, "image_url = VALUES(image_url)")
-	assert.Equal(t, []any{"称号A", 2, "https://example.com/honor.png"}, exec.args)
+	assertEnsureHonorInsertArgs(t, exec.args, "称号A", 2, "https://example.com/honor.png")
 }
 
 func TestEnsureHonor_画像URLがnilの場合はNULLでUpsertする(t *testing.T) {
@@ -98,7 +99,7 @@ func TestEnsureHonor_画像URLがnilの場合はNULLでUpsertする(t *testing.T
 	assert.Equal(t, 10, result.ID)
 	assert.False(t, result.ImageURLRegistered)
 	assert.Contains(t, exec.query, "ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)")
-	assert.Equal(t, []any{"称号A", 2, nil}, exec.args)
+	assertEnsureHonorInsertArgs(t, exec.args, "称号A", 2, nil)
 }
 
 func TestEnsureHonor_既存の通常称号はINSERTせず既存IDを返す(t *testing.T) {
@@ -131,7 +132,7 @@ func TestEnsureHonor_画像URLが空文字の場合はNULLでUpsertする(t *tes
 	// Then
 	require.NoError(t, err)
 	assert.Equal(t, 10, result.ID)
-	assert.Equal(t, []any{"称号A", 2, nil}, exec.args)
+	assertEnsureHonorInsertArgs(t, exec.args, "称号A", 2, nil)
 }
 
 func TestEnsureHonor_同じ画像URLの称号がある場合は手動変更済みの既存IDを返す(t *testing.T) {
@@ -368,12 +369,12 @@ func TestHonorCreate_空の画像URLはNULLで保存する(t *testing.T) {
 	repo := &honorRepository{}
 
 	// When
-	created, err := repo.Create(context.Background(), exec, &entity.Honor{Name: "称号A", HonorTypeID: 1, ImageURL: "  "})
+	created, err := repo.Create(context.Background(), exec, &entity.Honor{DisplayID: "0123456789abcdef", Name: "称号A", HonorTypeID: 1, ImageURL: "  "})
 
 	// Then
 	require.NoError(t, err)
 	require.NotNil(t, created)
-	assert.Equal(t, []any{"称号A", 1, nil}, exec.args)
+	assert.Equal(t, []any{"0123456789abcdef", "称号A", 1, nil}, exec.args)
 }
 
 func TestHonorSave_空の画像URLはNULLで保存する(t *testing.T) {
@@ -434,7 +435,7 @@ func TestHonorDelete_更新対象がない場合はErrHonorNotFoundを返す(t *
 	repo := &honorRepository{}
 
 	// When
-	err := repo.Delete(context.Background(), exec, 1)
+	err := repo.DeleteByDisplayID(context.Background(), exec, "0000000000000001")
 
 	// Then
 	assert.ErrorIs(t, err, domainrepo.ErrHonorNotFound)
@@ -449,7 +450,7 @@ func TestHonorDelete_参照制約違反はErrHonorConflictへ変換する(t *tes
 	repo := &honorRepository{}
 
 	// When
-	err := repo.Delete(context.Background(), exec, 1)
+	err := repo.DeleteByDisplayID(context.Background(), exec, "0000000000000001")
 
 	// Then
 	assert.ErrorIs(t, err, domainrepo.ErrHonorConflict)
@@ -465,4 +466,14 @@ func TestWrapHonorDuplicateError_対象外のエラーは変換しない(t *test
 	// Then
 	assert.ErrorIs(t, got, err)
 	assert.NotErrorIs(t, got, domainrepo.ErrHonorConflict)
+}
+
+// assertEnsureHonorInsertArgs は新規称号のINSERT引数が、採番した公開IDと続く列値になっていることを確認します。
+func assertEnsureHonorInsertArgs(t *testing.T, args []any, want ...any) {
+	t.Helper()
+	require.Len(t, args, len(want)+1)
+	displayID, ok := args[0].(string)
+	require.True(t, ok)
+	assert.True(t, displayid.DisplayID(displayID).IsValid())
+	assert.Equal(t, want, args[1:])
 }
