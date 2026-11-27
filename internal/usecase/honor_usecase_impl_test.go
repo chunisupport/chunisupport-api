@@ -9,7 +9,6 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/masterdata"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/master"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/stretchr/testify/assert"
@@ -63,7 +62,7 @@ type honorRepositoryMock struct {
 	deleteErr      error
 
 	findByIDCalled bool
-	findByIDID     displayid.DisplayID
+	findByIDID     int
 	createCalled   bool
 	saveCalled     bool
 	deleteCalled   bool
@@ -75,7 +74,7 @@ func (m *honorRepositoryMock) FindAll(context.Context, repository.Executor) ([]*
 	return []*entity.Honor{}, nil
 }
 
-func (m *honorRepositoryMock) FindByDisplayID(_ context.Context, _ repository.Executor, id displayid.DisplayID) (*entity.Honor, error) {
+func (m *honorRepositoryMock) FindByID(_ context.Context, _ repository.Executor, id int) (*entity.Honor, error) {
 	m.findByIDCalled = true
 	m.findByIDID = id
 	if m.findByIDErr != nil {
@@ -99,7 +98,7 @@ func (m *honorRepositoryMock) Save(_ context.Context, _ repository.Executor, hon
 	return m.saveErr
 }
 
-func (m *honorRepositoryMock) DeleteByDisplayID(context.Context, repository.Executor, displayid.DisplayID) error {
+func (m *honorRepositoryMock) Delete(context.Context, repository.Executor, int) error {
 	m.deleteCalled = true
 	return m.deleteErr
 }
@@ -151,8 +150,6 @@ func TestHonorUsecase_CreateHonor_入力を正規化して称号を作成する(
 	require.NoError(t, err)
 	assert.Equal(t, 10, got.ID)
 	require.NotNil(t, repo.createdHonor)
-	// 公開IDはDB主キーと独立にサーバー側で採番する。
-	assert.True(t, repo.createdHonor.DisplayID.IsValid())
 	assert.Equal(t, "称号A", repo.createdHonor.Name)
 	assert.Equal(t, 2, repo.createdHonor.HonorTypeID)
 	assert.Equal(t, "gold", repo.createdHonor.TypeName)
@@ -192,7 +189,7 @@ func TestHonorUsecase_UpdateHonor_既存称号を変更して保存する(t *tes
 	})
 
 	// When
-	got, err := uc.UpdateHonor(context.Background(), "000000000000000a", usecase.HonorInput{
+	got, err := uc.UpdateHonor(context.Background(), 10, usecase.HonorInput{
 		Name:     " 新称号 ",
 		TypeName: " gold ",
 		ImageURL: " https://example.com/new.png ",
@@ -219,7 +216,7 @@ func TestHonorUsecase_UpdateHonor_不正IDはErrInvalidHonorInputを返す(t *te
 	})
 
 	// When
-	got, err := uc.UpdateHonor(context.Background(), "0", usecase.HonorInput{Name: "称号A", TypeName: "gold"})
+	got, err := uc.UpdateHonor(context.Background(), 0, usecase.HonorInput{Name: "称号A", TypeName: "gold"})
 
 	// Then
 	assert.Nil(t, got)
@@ -233,7 +230,7 @@ func TestHonorUsecase_DeleteHonor_リポジトリエラーを返す(t *testing.T
 	uc := newHonorUsecaseForTest(repo, &masterdata.MasterDataMasters{})
 
 	// When
-	err := uc.DeleteHonor(context.Background(), "000000000000000a")
+	err := uc.DeleteHonor(context.Background(), 10)
 
 	// Then
 	assert.ErrorIs(t, err, repository.ErrHonorConflict)
@@ -246,7 +243,7 @@ func TestHonorUsecase_DeleteHonor_不正IDはErrInvalidHonorInputを返す(t *te
 	uc := newHonorUsecaseForTest(repo, &masterdata.MasterDataMasters{})
 
 	// When
-	err := uc.DeleteHonor(context.Background(), "0")
+	err := uc.DeleteHonor(context.Background(), 0)
 
 	// Then
 	assert.ErrorIs(t, err, usecase.ErrInvalidHonorInput)
@@ -254,12 +251,12 @@ func TestHonorUsecase_DeleteHonor_不正IDはErrInvalidHonorInputを返す(t *te
 }
 
 func TestHonorUsecase_GetHonor_不正IDはErrInvalidHonorInputを返す(t *testing.T) {
-	// Given: 公開IDの形式でない0を渡すと検査で拒否される想定
+	// Given: IDの境界値である0を渡すと検査で拒否される想定
 	repo := &honorRepositoryMock{}
 	uc := newHonorUsecaseForTest(repo, &masterdata.MasterDataMasters{})
 
 	// When
-	got, err := uc.GetHonor(context.Background(), "0")
+	got, err := uc.GetHonor(context.Background(), 0)
 
 	// Then: 入力エラーになりリポジトリへ問い合わせないこと
 	assert.Nil(t, got)
@@ -267,15 +264,15 @@ func TestHonorUsecase_GetHonor_不正IDはErrInvalidHonorInputを返す(t *testi
 	assert.False(t, repo.findByIDCalled)
 }
 
-func TestHonorUsecase_GetHonor_公開IDでリポジトリへ問い合わせる(t *testing.T) {
-	// Given: 公開IDが 0000000000000001 の称号が存在する想定
+func TestHonorUsecase_GetHonor_IDが1のときリポジトリへそのIDで問い合わせる(t *testing.T) {
+	// Given: 検査を通る最小のIDである1の称号が存在する想定
 	repo := &honorRepositoryMock{
 		findByIDResult: &entity.Honor{ID: 1, Name: "称号A", HonorTypeID: 2, TypeName: "gold"},
 	}
 	uc := newHonorUsecaseForTest(repo, &masterdata.MasterDataMasters{})
 
 	// When
-	got, err := uc.GetHonor(context.Background(), "0000000000000001")
+	got, err := uc.GetHonor(context.Background(), 1)
 
 	// Then: リポジトリへIDそのまま問い合わせて結果を返すこと
 	require.NoError(t, err)
@@ -283,5 +280,5 @@ func TestHonorUsecase_GetHonor_公開IDでリポジトリへ問い合わせる(t
 	assert.Equal(t, 1, got.ID)
 	assert.Equal(t, "称号A", got.Name)
 	assert.True(t, repo.findByIDCalled)
-	assert.Equal(t, displayid.DisplayID("0000000000000001"), repo.findByIDID)
+	assert.Equal(t, 1, repo.findByIDID)
 }

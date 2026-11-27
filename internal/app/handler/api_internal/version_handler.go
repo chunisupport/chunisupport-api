@@ -3,11 +3,11 @@ package api_internal
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/chunisupport/chunisupport-api/internal/app/apierror"
 	apphandler "github.com/chunisupport/chunisupport-api/internal/app/handler"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	internaldto "github.com/chunisupport/chunisupport-api/internal/dto/api_internal"
 	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/labstack/echo/v5"
@@ -77,12 +77,10 @@ func (h *VersionHandler) Delete(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
-// parseVersionID はパスのバージョンIDを公開ID（display_id）として検証します。
-// DBの数値主キーは受け付けません。
-func parseVersionID(raw string) (displayid.DisplayID, error) {
-	id, err := displayid.NewDisplayID(raw)
-	if err != nil {
-		return "", errors.Join(usecase.ErrInvalidVersionInput, err)
+func parseVersionID(raw string) (int, error) {
+	id, err := strconv.Atoi(raw)
+	if err != nil || id <= 0 {
+		return 0, usecase.ErrInvalidVersionInput
 	}
 	return id, nil
 }

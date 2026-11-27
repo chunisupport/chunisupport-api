@@ -5,12 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-const testVersionDisplayID displayid.DisplayID = "0123456789abcdef"
 
 func TestNewVersion(t *testing.T) {
 	tests := []struct {
@@ -36,13 +33,12 @@ func TestNewVersion(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			version, err := NewVersion(testVersionDisplayID, tt.inputName, tt.inputShortName, tt.date)
+			version, err := NewVersion(tt.inputName, tt.inputShortName, tt.date)
 			if tt.wantErr {
 				assert.ErrorIs(t, err, ErrInvalidVersion)
 				return
 			}
 			require.NoError(t, err)
-			assert.Equal(t, testVersionDisplayID, version.DisplayID)
 			assert.Equal(t, tt.wantName, version.Name)
 			assert.Equal(t, tt.wantShortName, version.ShortName)
 			assert.Equal(t, time.Date(2025, 12, 11, 0, 0, 0, 0, time.UTC), version.ReleasedAt)
@@ -50,17 +46,8 @@ func TestNewVersion(t *testing.T) {
 	}
 }
 
-func TestNewVersion_不正な公開IDは拒否する(t *testing.T) {
-	// When
-	version, err := NewVersion("1", "CHUNITHM VERSE", "VRS", time.Now())
-
-	// Then
-	assert.ErrorIs(t, err, ErrInvalidVersion)
-	assert.Nil(t, version)
-}
-
 func TestVersion_Rename(t *testing.T) {
-	version, err := NewVersion(testVersionDisplayID, "CHUNITHM VERSE", "VRS", time.Now())
+	version, err := NewVersion("CHUNITHM VERSE", "VRS", time.Now())
 	require.NoError(t, err)
 
 	err = version.Rename(" CHUNITHM VERSE II ", " VRS2 ")
@@ -72,7 +59,7 @@ func TestVersion_Rename(t *testing.T) {
 
 func TestVersion_Rename_不正な超ショート名は変更しない(t *testing.T) {
 	// Given
-	version, err := NewVersion(testVersionDisplayID, "CHUNITHM VERSE", "VRS", time.Now())
+	version, err := NewVersion("CHUNITHM VERSE", "VRS", time.Now())
 	require.NoError(t, err)
 
 	// When

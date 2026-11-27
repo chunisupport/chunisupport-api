@@ -86,7 +86,7 @@ DB上の `goals` テーブルは以下の構造です。
         "count": 1
       },
       "attributes": {
-        "diff": "MASTER",
+        "diff": 4,
         "const": {
           "min": 14.0,
           "max": 16.0
@@ -128,7 +128,7 @@ DB上の `goals` テーブルは以下の構造です。
     "count": 1
   },
   "attributes": {
-    "diff": "MASTER",
+    "diff": 4,
     "const": {
       "min": 14.0,
       "max": 16.0
@@ -229,7 +229,7 @@ DB上の `goals` テーブルは以下の構造です。
     "count": 1
   },
   "attributes": {
-    "diff": "MASTER",
+    "diff": 4,
     "const": {
       "min": 14.0,
       "max": 16.0
@@ -530,13 +530,13 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 
 ```json
 {
-  "diff": "MASTER",
+  "diff": 4,
   "const": {
     "min": 14.0,
     "max": 16.0
   },
-  "genre": ["POPS & ANIME", "niconico"],
-  "ver": "3f2a9c1d0b4e5a67"
+  "genre": [1, 2],
+  "ver": 20
 }
 ```
 
@@ -546,33 +546,33 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 
 ### 8.2 `diff`
 
-難易度名（マスタデータの `difficulties[].name`。`BASIC` / `ADVANCED` / `EXPERT` / `MASTER` / `ULTIMA`）です。DBの数値IDは受け付けません。
+難易度IDです。
 
 許可される入力形状:
 
-- 単一文字列
-- 文字列配列
+- 単一整数
+- 整数配列
 
 例:
 
 ```json
-{ "diff": "MASTER" }
+{ "diff": 4 }
 ```
 
 ```json
-{ "diff": ["EXPERT", "MASTER"] }
+{ "diff": [3, 4] }
 ```
 
 条件:
 
 - 空配列は不可
 - `null` は不可
-- 数値（DBの数値ID）は不可
-- マスタに存在する難易度名のみ可（完全一致）
+- 小数は不可
+- マスタに存在する difficulty ID のみ可
 
 正規化仕様:
 
-- マスタの表示順（`sort_order` 昇順）に並べられます
+- 昇順ソートされます
 - 重複は除去されます
 - 1件だけならスカラーに正規化されます
 
@@ -581,38 +581,38 @@ BASIC〜MASTER の4難易度すべてを達成した楽曲数を数えます。
 入力:
 
 ```json
-{ "diff": ["MASTER", "MASTER"] }
+{ "diff": [4, 4] }
 ```
 
 保存・返却:
 
 ```json
-{ "diff": "MASTER" }
+{ "diff": 4 }
 ```
 
 ### 8.3 `genre`
 
-ジャンル名（マスタデータの `genres[].name`）です。DBの数値IDは受け付けません。
+ジャンルIDです。
 
 許可される入力形状:
 
-- 単一文字列
-- 文字列配列
+- 単一整数
+- 整数配列
 
-正規化仕様は `diff` と同じです（表示順はジャンルの `sort_order` 昇順）。
-存在するジャンル名のみ許可されます。
+正規化仕様は `diff` と同じです。
+存在する genre ID のみ許可されます。
 
 ### 8.4 `ver`
 
-バージョンの公開ID（マスタデータの `versions[].id`。16文字の小文字16進数）です。バージョンは改名されるため名称ではなく公開IDで保存し、DBの数値IDは受け付けません。
+バージョンIDです。
 
 許可される入力形状:
 
-- 単一文字列
-- 文字列配列
+- 単一整数
+- 整数配列
 
-正規化仕様は `diff` と同じです（表示順はバージョンのリリース日昇順）。
-稼働開始済みのバージョンの公開IDのみ許可されます。
+正規化仕様は `diff` と同じです。
+存在する version ID のみ許可されます。
 
 重要な内部仕様:
 
@@ -924,18 +924,15 @@ type GoalAchievementType =
   | 'overpower_percent';
 
 type GoalAttributes = {
-  /** 難易度名（マスタの difficulties[].name） */
-  diff?: string | string[];
+  diff?: number | number[];
   const?: {
     min: number;
     max: number;
   };
   /** const の入力方法。省略時は 'number' として扱う */
   const_filter_mode?: 'level' | 'number';
-  /** ジャンル名（マスタの genres[].name） */
-  genre?: string | string[];
-  /** バージョンの公開ID（マスタの versions[].id） */
-  ver?: string | string[];
+  genre?: number | number[];
+  ver?: number | number[];
   /** 楽曲名順フォルダのコード（マスタの name_folders[].code） */
   name_folder?: string | string[];
 };
@@ -969,5 +966,5 @@ type GoalsResponse = {
 };
 ```
 
-実際には返却時の `diff` / `genre` / `ver` は、正規化の結果として単一の `string` になることがあります。
-そのため受信側は `string | string[]` として扱うのが安全です。
+実際には返却時の `diff` / `genre` / `ver` は、正規化の結果として `number` になることがあります。
+そのため受信側は `number | number[]` として扱うのが安全です。

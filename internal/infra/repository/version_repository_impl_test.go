@@ -7,7 +7,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,10 +15,10 @@ import (
 
 func TestVersionRepository_FindLatest(t *testing.T) {
 	db := newVersionRepositoryTestDB(t)
-	_, err := db.Exec(`INSERT INTO versions (id, display_id, name, short_name, released_at) VALUES
-		(1, '0000000000000001', 'CHUNITHM A', 'A', '2025-01-01'),
-		(2, '0000000000000002', 'CHUNITHM B', 'B', '2026-01-01'),
-		(3, '0000000000000003', 'CHUNITHM C', 'C', '2026-01-01')`)
+	_, err := db.Exec(`INSERT INTO versions (id, name, short_name, released_at) VALUES
+		(1, 'CHUNITHM A', 'A', '2025-01-01'),
+		(2, 'CHUNITHM B', 'B', '2026-01-01'),
+		(3, 'CHUNITHM C', 'C', '2026-01-01')`)
 	require.NoError(t, err)
 	repo := NewVersionRepository()
 
@@ -27,7 +26,6 @@ func TestVersionRepository_FindLatest(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 3, latest.ID)
-	assert.Equal(t, displayid.DisplayID("0000000000000003"), latest.DisplayID)
 }
 
 func TestVersionRepository_ExistsSongInRange(t *testing.T) {
@@ -61,22 +59,20 @@ func TestVersionRepository_CRUD(t *testing.T) {
 	db := newVersionRepositoryTestDB(t)
 	repo := NewVersionRepository()
 	ctx := context.Background()
-	version, err := entity.NewVersion("fedcba9876543210", "CHUNITHM VERSE", "VRS", repositoryTestDate(2025, 1, 1))
+	version, err := entity.NewVersion("CHUNITHM VERSE", "VRS", repositoryTestDate(2025, 1, 1))
 	require.NoError(t, err)
 
 	created, err := repo.Create(ctx, db, version)
 	require.NoError(t, err)
-	assert.Equal(t, version.DisplayID, created.DisplayID)
 	created.Name = "CHUNITHM VERSE II"
 	created.ShortName = "VRS2"
 	require.NoError(t, repo.Save(ctx, db, created))
-	found, err := repo.FindByDisplayID(ctx, db, version.DisplayID)
+	found, err := repo.FindByID(ctx, db, created.ID)
 	require.NoError(t, err)
-	assert.Equal(t, created.ID, found.ID)
 	assert.Equal(t, "CHUNITHM VERSE II", found.Name)
 	assert.Equal(t, "VRS2", found.ShortName)
 	require.NoError(t, repo.Delete(ctx, db, created.ID))
-	_, err = repo.FindByDisplayID(ctx, db, version.DisplayID)
+	_, err = repo.FindByID(ctx, db, created.ID)
 	assert.ErrorIs(t, err, domainrepo.ErrVersionNotFound)
 	assert.ErrorIs(t, repo.Delete(ctx, db, created.ID), domainrepo.ErrVersionNotFound)
 }
@@ -87,7 +83,7 @@ func newVersionRepositoryTestDB(t *testing.T) *sqlx.DB {
 	require.NoError(t, err)
 	db.SetMaxOpenConns(1)
 	_, err = db.Exec(`
-		CREATE TABLE versions (id INTEGER PRIMARY KEY AUTOINCREMENT, display_id TEXT NOT NULL UNIQUE, name TEXT NOT NULL UNIQUE, short_name TEXT NOT NULL UNIQUE, released_at DATE NOT NULL);
+		CREATE TABLE versions (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, short_name TEXT NOT NULL UNIQUE, released_at DATE NOT NULL);
 		CREATE TABLE songs (released_at DATE NULL);
 	`)
 	require.NoError(t, err)

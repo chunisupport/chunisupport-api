@@ -61,5 +61,5 @@ func TestRegisterRoutes_Genres(t *testing.T) {
 
 	// Then
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"genres":[{"name":"POPS & ANIME","short_name":"P&A"}]}`, rec.Body.String())
+	assert.JSONEq(t, `{"genres":[{"id":1,"name":"POPS & ANIME","short_name":"P&A"}]}`, rec.Body.String())
 }

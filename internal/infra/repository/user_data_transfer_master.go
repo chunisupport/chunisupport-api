@@ -34,18 +34,12 @@ type transferMasterData struct {
 	honorIDsByImage       map[string]int
 	honorIDsByNameAndType map[string]int
 	achievementTypeIDs    map[string]int
-	// goalAttributeNames は目標の絞り込み属性ごとに、保存値から移行ファイル上のマスタ名を引きます。
-	goalAttributeNames map[string]map[string]string
-	// goalAttributeStoredValues は目標の絞り込み属性ごとに、移行ファイル上のマスタ名から保存値を引きます。
-	goalAttributeStoredValues map[string]map[string]string
-}
-
-// transferGoalAttributeQueries は目標の絞り込み属性ごとの保存値とマスタ名の対応を取得するSQLです。
-// 難易度・ジャンルはマスタ名、バージョンは改名で参照が切れないよう公開IDで保存しています。
-var transferGoalAttributeQueries = map[string]string{
-	"diff":  `SELECT name AS stored_value, name FROM difficulties`,
-	"genre": `SELECT name AS stored_value, name FROM genres`,
-	"ver":   `SELECT display_id AS stored_value, name FROM versions`,
+	difficultyIDs         map[string]int
+	difficultyNames       map[int]string
+	genreIDs              map[string]int
+	genreNames            map[int]string
+	versionIDs            map[string]int
+	versionNames          map[int]string
 }
 
 func loadTransferMasterData(ctx context.Context, exec domainrepo.Executor) (*transferMasterData, error) {
@@ -95,24 +89,14 @@ func loadTransferMasterData(ctx context.Context, exec domainrepo.Executor) (*tra
 	if masters.achievementTypeIDs, err = selectTransferStringIntMap(ctx, exec, `SELECT code AS name, id FROM achievement_types`); err != nil {
 		return nil, err
 	}
-	masters.goalAttributeNames = make(map[string]map[string]string, len(transferGoalAttributeQueries))
-	masters.goalAttributeStoredValues = make(map[string]map[string]string, len(transferGoalAttributeQueries))
-	for key, query := range transferGoalAttributeQueries {
-		var rows []struct {
-			StoredValue string `db:"stored_value"`
-			Name        string `db:"name"`
-		}
-		if err := exec.SelectContext(ctx, &rows, query); err != nil {
-			return nil, err
-		}
-		names := make(map[string]string, len(rows))
-		storedValues := make(map[string]string, len(rows))
-		for _, row := range rows {
-			names[row.StoredValue] = row.Name
-			storedValues[row.Name] = row.StoredValue
-		}
-		masters.goalAttributeNames[key] = names
-		masters.goalAttributeStoredValues[key] = storedValues
+	if masters.difficultyIDs, masters.difficultyNames, err = selectTransferBidirectionalMap(ctx, exec, `SELECT id, name FROM difficulties`); err != nil {
+		return nil, err
+	}
+	if masters.genreIDs, masters.genreNames, err = selectTransferBidirectionalMap(ctx, exec, `SELECT id, name FROM genres`); err != nil {
+		return nil, err
+	}
+	if masters.versionIDs, masters.versionNames, err = selectTransferBidirectionalMap(ctx, exec, `SELECT id, name FROM versions`); err != nil {
+		return nil, err
 	}
 	var honors []struct {
 		ID       int     `db:"id"`
@@ -149,6 +133,18 @@ func selectTransferStringIntMap(ctx context.Context, exec domainrepo.Executor, q
 	return result, nil
 }
 
+func selectTransferBidirectionalMap(ctx context.Context, exec domainrepo.Executor, query string) (map[string]int, map[int]string, error) {
+	byName, err := selectTransferStringIntMap(ctx, exec, query)
+	if err != nil {
+		return nil, nil, err
+	}
+	byID := make(map[int]string, len(byName))
+	for name, id := range byName {
+		byID[id] = name
+	}
+	return byName, byID, nil
+}
+
 func transferChartKey(officialIdx, difficulty string) string {
 	return officialIdx + "\x00" + difficulty
 }
@@ -169,9 +165,7 @@ func (m *transferMasterData) rememberHonor(id int, imageURL *string, name, typeN
 	m.honorIDsByNameAndType[name+"\x00"+typeName] = id
 }
 
-// transformTransferGoalAttributes は目標の絞り込み属性 diff / genre / ver の各値を conversions で置き換えます。
-// 単一値・配列の形は維持し、対応がない値はエラーにします。
-func transformTransferGoalAttributes(raw json.RawMessage, conversions map[string]map[string]string) (json.RawMessage, error) {
+func transformTransferGoalAttributes(raw json.RawMessage, maps map[string]map[string]int, reverseMaps map[string]map[int]string, toExternal bool) (json.RawMessage, error) {
 	var attrs map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &attrs); err != nil {
 		return nil, err
@@ -181,26 +175,42 @@ func transformTransferGoalAttributes(raw json.RawMessage, conversions map[string
 		if !ok {
 			continue
 		}
+		var items []any
 		var decoded any
 		if err := json.Unmarshal(value, &decoded); err != nil {
 			return nil, err
 		}
-		items := []any{decoded}
-		array, isArray := decoded.([]any)
-		if isArray {
-			items = array
+		isArray := false
+		switch typed := decoded.(type) {
+		case []any:
+			items = typed
+			isArray = true
+		default:
+			items = []any{typed}
 		}
 		converted := make([]any, 0, len(items))
 		for _, item := range items {
-			text, ok := item.(string)
-			if !ok {
-				return nil, fmt.Errorf("goal attribute %s contains a non-string value", key)
+			if toExternal {
+				number, ok := item.(float64)
+				if !ok || number != float64(int(number)) {
+					return nil, fmt.Errorf("goal attribute %s contains a non-integer ID", key)
+				}
+				name, ok := reverseMaps[key][int(number)]
+				if !ok {
+					return nil, fmt.Errorf("goal attribute %s contains an unknown ID", key)
+				}
+				converted = append(converted, name)
+			} else {
+				name, ok := item.(string)
+				if !ok {
+					return nil, fmt.Errorf("goal attribute %s contains a non-string name", key)
+				}
+				id, ok := maps[key][name]
+				if !ok {
+					return nil, fmt.Errorf("goal attribute %s contains an unknown name", key)
+				}
+				converted = append(converted, id)
 			}
-			convertedValue, ok := conversions[key][text]
-			if !ok {
-				return nil, fmt.Errorf("goal attribute %s contains an unknown value", key)
-			}
-			converted = append(converted, convertedValue)
 		}
 		var normalized any = converted
 		if !isArray && len(converted) == 1 {
@@ -219,14 +229,12 @@ func transformTransferGoalAttributes(raw json.RawMessage, conversions map[string
 	return encoded, nil
 }
 
-// externalizeGoalAttributes は保存済みの目標属性を移行ファイル形式（マスタ名）へ変換します。
 func (m *transferMasterData) externalizeGoalAttributes(raw json.RawMessage) (json.RawMessage, error) {
-	return transformTransferGoalAttributes(raw, m.goalAttributeNames)
+	return transformTransferGoalAttributes(raw, nil, map[string]map[int]string{"diff": m.difficultyNames, "genre": m.genreNames, "ver": m.versionNames}, true)
 }
 
-// internalizeGoalAttributes は移行ファイル形式（マスタ名）の目標属性を保存形式へ変換します。
 func (m *transferMasterData) internalizeGoalAttributes(raw json.RawMessage) (json.RawMessage, error) {
-	return transformTransferGoalAttributes(raw, m.goalAttributeStoredValues)
+	return transformTransferGoalAttributes(raw, map[string]map[string]int{"diff": m.difficultyIDs, "genre": m.genreIDs, "ver": m.versionIDs}, nil, false)
 }
 
 func parseTransferOfficialIndex(value string) uint64 {

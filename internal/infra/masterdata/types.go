@@ -12,7 +12,6 @@ type Item = domainmasterdata.Item
 // Version はバージョンマスタ項目を表します。
 type Version struct {
 	ID         uint8     `db:"id"`
-	DisplayID  string    `db:"display_id"`
 	Name       string    `db:"name"`
 	ShortName  string    `db:"short_name"`
 	ReleasedAt time.Time `db:"released_at"`

@@ -7,9 +7,8 @@ import (
 )
 
 // HonorDTO は管理者向け称号情報DTOです。
-// id にはDBの数値主キーではなく公開ID（display_id）を返します。
 type HonorDTO struct {
-	ID        string     `json:"id"`
+	ID        int        `json:"id"`
 	Name      string     `json:"name"`
 	TypeName  string     `json:"type_name"`
 	ImageURL  string     `json:"image_url"`
@@ -34,7 +33,7 @@ func ToHonorDTO(honor *entity.Honor) *HonorDTO {
 		return nil
 	}
 	return &HonorDTO{
-		ID:        honor.DisplayID.String(),
+		ID:        honor.ID,
 		Name:      honor.Name,
 		TypeName:  honor.TypeName,
 		ImageURL:  honor.ImageURL,

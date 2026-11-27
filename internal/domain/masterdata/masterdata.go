@@ -16,10 +16,7 @@ type Item struct {
 
 // Version はバージョンマスタの1件を表します。
 type Version struct {
-	// ID はDB内部の参照専用で、APIには公開しません。
-	ID uint8
-	// DisplayID はAPI上の id として公開する識別子です。
-	DisplayID  string
+	ID         uint8
 	Name       string
 	ShortName  string
 	ReleasedAt time.Time
@@ -120,19 +117,15 @@ func (m *SongMasters) DifficultySortOrderByID() map[int]int {
 }
 
 // GoalMasters は目標機能で必要になるマスタ集合です。
-// 目標の絞り込み属性はDBの数値IDではなく公開識別子で保存するため、各マスタは公開識別子をキーに持ちます。
 type GoalMasters struct {
 	AchievementTypesByCode map[string]Item
 	AchievementTypesByID   map[int]string
-	// Difficulties は難易度名をキーにした難易度マスタです。
-	Difficulties map[string]master.ChartDifficulty
-	// Genres はジャンル名をキーにしたジャンルマスタです。
-	Genres map[string]master.Genre
-	// VersionsByDisplayID は公開IDをキーにした稼働開始済みのバージョンマスタです。
-	VersionsByDisplayID map[string]Version
-	NameFoldersByCode   map[string]NameFolder
-	ClearLampNamesByID  map[int]string
-	ComboLampNamesByID  map[int]string
+	DifficultyNamesByID    map[int]string
+	GenreNamesByID         map[int]string
+	VersionsByID           map[int]Version
+	NameFoldersByCode      map[string]NameFolder
+	ClearLampNamesByID     map[int]string
+	ComboLampNamesByID     map[int]string
 }
 
 // MasterDataMasters はマスタデータAPIで必要になるマスタ集合です。

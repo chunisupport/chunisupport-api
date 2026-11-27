@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 	"testing"
@@ -12,7 +11,6 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
-	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -33,12 +31,12 @@ type versionRepositoryStub struct {
 func (s *versionRepositoryStub) FindAll(context.Context, repository.Executor) ([]*entity.Version, error) {
 	return s.versions, s.findErr
 }
-func (s *versionRepositoryStub) FindByDisplayID(context.Context, repository.Executor, displayid.DisplayID) (*entity.Version, error) {
+func (s *versionRepositoryStub) FindByID(context.Context, repository.Executor, int) (*entity.Version, error) {
 	return nil, repository.ErrVersionNotFound
 }
-func (s *versionRepositoryStub) FindByDisplayIDForUpdate(_ context.Context, _ repository.Executor, id displayid.DisplayID) (*entity.Version, error) {
+func (s *versionRepositoryStub) FindByIDForUpdate(_ context.Context, _ repository.Executor, id int) (*entity.Version, error) {
 	for _, version := range s.versions {
-		if version.DisplayID == id {
+		if version.ID == id {
 			copy := *version
 			return &copy, nil
 		}
@@ -97,7 +95,7 @@ func (s *versionCacheReloaderStub) ReloadVersions(ctx context.Context) error {
 }
 
 func TestVersionUsecase_Create(t *testing.T) {
-	repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, DisplayID: versionDisplayIDForTest(1), ReleasedAt: dateForVersionTest(2024, 1, 1)}}}
+	repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, ReleasedAt: dateForVersionTest(2024, 1, 1)}}}
 	reloader := &versionCacheReloaderStub{}
 	uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
 
@@ -105,8 +103,6 @@ func TestVersionUsecase_Create(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, 3, created.ID)
-	// 公開IDはDB主キーと独立にサーバー側で採番する。
-	assert.True(t, created.DisplayID.IsValid())
 	assert.Equal(t, "CHUNITHM VERSE", created.Name)
 	assert.Equal(t, "VRS", created.ShortName)
 	assert.Equal(t, 1, reloader.calls)
@@ -146,7 +142,7 @@ func TestVersionUsecase_Create_同日でなければ受理する(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
-			repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, DisplayID: versionDisplayIDForTest(1), ReleasedAt: tt.existing}}}
+			repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, ReleasedAt: tt.existing}}}
 			reloader := &versionCacheReloaderStub{}
 			uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
 
@@ -186,11 +182,11 @@ func TestVersionUsecase_Create_名前重複を返す(t *testing.T) {
 
 func TestVersionUsecase_Rename_稼働日は変えない(t *testing.T) {
 	releasedAt := dateForVersionTest(2025, 1, 1)
-	repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, DisplayID: versionDisplayIDForTest(1), Name: "CHUNITHM VERS", ReleasedAt: releasedAt}}}
+	repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, Name: "CHUNITHM VERS", ReleasedAt: releasedAt}}}
 	reloader := &versionCacheReloaderStub{}
 	uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
 
-	updated, err := uc.Rename(context.Background(), versionDisplayIDForTest(1), "CHUNITHM VERSE", "VRS")
+	updated, err := uc.Rename(context.Background(), 1, "CHUNITHM VERSE", "VRS")
 
 	require.NoError(t, err)
 	assert.Equal(t, releasedAt, updated.ReleasedAt)
@@ -214,13 +210,13 @@ func TestVersionUsecase_Delete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := &versionRepositoryStub{versions: []*entity.Version{
-				{ID: 1, DisplayID: versionDisplayIDForTest(1), ReleasedAt: dateForVersionTest(2024, 1, 1)},
-				{ID: 2, DisplayID: versionDisplayIDForTest(2), ReleasedAt: dateForVersionTest(2025, 1, 1)},
+				{ID: 1, ReleasedAt: dateForVersionTest(2024, 1, 1)},
+				{ID: 2, ReleasedAt: dateForVersionTest(2025, 1, 1)},
 			}, inUse: tt.inUse}
 			reloader := &versionCacheReloaderStub{}
 			uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
 
-			err := uc.Delete(context.Background(), versionDisplayIDForTest(tt.id))
+			err := uc.Delete(context.Background(), tt.id)
 
 			if tt.wantErr != nil {
 				assert.ErrorIs(t, err, tt.wantErr)
@@ -262,14 +258,14 @@ func TestVersionUsecase_コミット後の再読込失敗を操作失敗とし�
 		{
 			name: "名称変更",
 			operation: func(uc VersionUsecase) error {
-				_, err := uc.Rename(context.Background(), versionDisplayIDForTest(2), "CHUNITHM VERSE PLUS", "VRS")
+				_, err := uc.Rename(context.Background(), 2, "CHUNITHM VERSE PLUS", "VRS")
 				return err
 			},
 		},
 		{
 			name: "削除",
 			operation: func(uc VersionUsecase) error {
-				return uc.Delete(context.Background(), versionDisplayIDForTest(2))
+				return uc.Delete(context.Background(), 2)
 			},
 		},
 	}
@@ -278,8 +274,8 @@ func TestVersionUsecase_コミット後の再読込失敗を操作失敗とし�
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
 			repo := &versionRepositoryStub{versions: []*entity.Version{
-				{ID: 1, DisplayID: versionDisplayIDForTest(1), Name: "CHUNITHM LUMINOUS", ReleasedAt: dateForVersionTest(2024, 1, 1)},
-				{ID: 2, DisplayID: versionDisplayIDForTest(2), Name: "CHUNITHM VERSE", ReleasedAt: dateForVersionTest(2025, 1, 1)},
+				{ID: 1, Name: "CHUNITHM LUMINOUS", ReleasedAt: dateForVersionTest(2024, 1, 1)},
+				{ID: 2, Name: "CHUNITHM VERSE", ReleasedAt: dateForVersionTest(2025, 1, 1)},
 			}}
 			reloader := &versionCacheReloaderStub{err: errors.New("reload failed")}
 			uc := NewVersionUsecase(repo, reloader, transactionManagerStub{}, nil)
@@ -308,11 +304,6 @@ func TestVersionUsecase_再読込は要求キャンセルから切り離す(t *t
 	assert.NoError(t, reloader.ctxErr)
 }
 
-// versionDisplayIDForTest はテスト用の内部IDに対応する公開IDを返します。
-func versionDisplayIDForTest(id int) displayid.DisplayID {
-	return displayid.DisplayID(fmt.Sprintf("%016x", id))
-}
-
 func dateForVersionTest(year int, month time.Month, day int) time.Time {
 	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
@@ -333,7 +324,7 @@ func TestVersionUsecase_不正な名前はドメインエラーを保持する(t
 		{
 			name: "名称変更",
 			run: func(uc VersionUsecase) error {
-				_, err := uc.Rename(context.Background(), versionDisplayIDForTest(1), "VERSE", "VRS")
+				_, err := uc.Rename(context.Background(), 1, "VERSE", "VRS")
 				return err
 			},
 		},
@@ -341,7 +332,7 @@ func TestVersionUsecase_不正な名前はドメインエラーを保持する(t
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Given
-			repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, DisplayID: versionDisplayIDForTest(1), Name: "CHUNITHM VERS", ReleasedAt: dateForVersionTest(2024, 1, 1)}}}
+			repo := &versionRepositoryStub{versions: []*entity.Version{{ID: 1, Name: "CHUNITHM VERS", ReleasedAt: dateForVersionTest(2024, 1, 1)}}}
 			uc := NewVersionUsecase(repo, &versionCacheReloaderStub{}, transactionManagerStub{}, nil)
 
 			// When

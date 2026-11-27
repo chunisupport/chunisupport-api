@@ -81,27 +81,15 @@ func (u *goalUsecase) ValidateTransferredGoals(ctx context.Context, goals entity
 	}
 	return nil
 }
-
-// internalizeTransferredGoalAttributes は移行ファイルの絞り込み属性（マスタ名）を保存形式へ変換します。
-// 難易度・ジャンルはマスタ名のまま保存し、バージョンは改名で参照が切れないよう公開IDへ変換します。
 func internalizeTransferredGoalAttributes(raw json.RawMessage, masters *domainmasterdata.GoalMasters) ([]byte, error) {
 	var attrs map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &attrs); err != nil {
 		return nil, err
 	}
-	stored := map[string]map[string]string{
-		"diff":  make(map[string]string, len(masters.Difficulties)),
-		"genre": make(map[string]string, len(masters.Genres)),
-		"ver":   make(map[string]string, len(masters.VersionsByDisplayID)),
-	}
-	for name := range masters.Difficulties {
-		stored["diff"][name] = name
-	}
-	for name := range masters.Genres {
-		stored["genre"][name] = name
-	}
-	for displayID, version := range masters.VersionsByDisplayID {
-		stored["ver"][version.Name] = displayID
+	reverse := map[string]map[string]int{
+		"diff":  reverseTransferredNames(masters.DifficultyNamesByID),
+		"genre": reverseTransferredNames(masters.GenreNamesByID),
+		"ver":   reverseTransferredVersions(masters.VersionsByID),
 	}
 	for _, key := range []string{"diff", "genre", "ver"} {
 		value, ok := attrs[key]
@@ -118,21 +106,21 @@ func internalizeTransferredGoalAttributes(raw json.RawMessage, masters *domainma
 			items = array
 			isArray = true
 		}
-		values := make([]any, 0, len(items))
+		ids := make([]any, 0, len(items))
 		for _, item := range items {
 			name, ok := item.(string)
 			if !ok {
 				return nil, fmt.Errorf("%s must contain master names", key)
 			}
-			storedValue, ok := stored[key][name]
+			id, ok := reverse[key][name]
 			if !ok {
 				return nil, fmt.Errorf("%s contains an unknown master name", key)
 			}
-			values = append(values, storedValue)
+			ids = append(ids, id)
 		}
-		var normalized any = values
-		if !isArray && len(values) == 1 {
-			normalized = values[0]
+		var normalized any = ids
+		if !isArray && len(ids) == 1 {
+			normalized = ids[0]
 		}
 		encoded, err := json.Marshal(normalized)
 		if err != nil {
@@ -141,6 +129,22 @@ func internalizeTransferredGoalAttributes(raw json.RawMessage, masters *domainma
 		attrs[key] = encoded
 	}
 	return json.Marshal(attrs)
+}
+
+func reverseTransferredNames(values map[int]string) map[string]int {
+	result := make(map[string]int, len(values))
+	for id, name := range values {
+		result[name] = id
+	}
+	return result
+}
+
+func reverseTransferredVersions(values map[int]domainmasterdata.Version) map[string]int {
+	result := make(map[string]int, len(values))
+	for id, version := range values {
+		result[version.Name] = id
+	}
+	return result
 }
 
 var _ UserDataTransferGoalValidator = (*goalUsecase)(nil)

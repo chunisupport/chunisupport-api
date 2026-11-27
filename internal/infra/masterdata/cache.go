@@ -199,7 +199,7 @@ func Preload(ctx context.Context, db *sqlx.DB) (*Cache, error) {
 		accountTypes[row.Name] = master.AccountType{ID: row.ID, Name: row.Name}
 	}
 
-	const versionQuery = `SELECT id, display_id, name, short_name, released_at FROM versions`
+	const versionQuery = `SELECT id, name, short_name, released_at FROM versions`
 	allVersions, err := loadVersionMasters(ctx, db, versionQuery)
 	if err != nil {
 		return nil, fmt.Errorf("failed to preload versions: %w", err)
@@ -259,7 +259,7 @@ func (c *Cache) ReloadVersions(ctx context.Context) error {
 	c.versionsReloadMu.Lock()
 	defer c.versionsReloadMu.Unlock()
 
-	const query = `SELECT id, display_id, name, short_name, released_at FROM versions`
+	const query = `SELECT id, name, short_name, released_at FROM versions`
 	allVersions, err := loadVersionMasters(ctx, c.db, query)
 	if err != nil {
 		c.versionsMu.Lock()
@@ -500,31 +500,25 @@ func (c *Cache) GoalMasters() *domainmasterdata.GoalMasters {
 	}
 
 	publicVersions := c.PublicVersionsByID()
-	versionsByDisplayID := make(map[string]domainmasterdata.Version, len(publicVersions))
-	for _, v := range publicVersions {
-		versionsByDisplayID[v.DisplayID] = toDomainVersion(v)
+	versionsByID := make(map[int]domainmasterdata.Version, len(publicVersions))
+	for k, v := range publicVersions {
+		versionsByID[k] = domainmasterdata.Version{
+			ID:         v.ID,
+			Name:       v.Name,
+			ShortName:  v.ShortName,
+			ReleasedAt: v.ReleasedAt,
+		}
 	}
 
 	return &domainmasterdata.GoalMasters{
 		AchievementTypesByCode: maps.Clone(c.AchievementTypes),
 		AchievementTypesByID:   maps.Clone(c.AchievementTypesByID),
-		Difficulties:           maps.Clone(c.Difficulties),
-		Genres:                 maps.Clone(c.Genres),
-		VersionsByDisplayID:    versionsByDisplayID,
+		DifficultyNamesByID:    maps.Clone(c.DifficultyNamesByID),
+		GenreNamesByID:         maps.Clone(c.GenreNamesByID),
+		VersionsByID:           versionsByID,
 		NameFoldersByCode:      maps.Clone(c.NameFolders),
 		ClearLampNamesByID:     maps.Clone(c.ClearLampNamesByID),
 		ComboLampNamesByID:     maps.Clone(c.ComboLampNamesByID),
-	}
-}
-
-// toDomainVersion はキャッシュのバージョンをドメインのマスタ型へ変換します。
-func toDomainVersion(v Version) domainmasterdata.Version {
-	return domainmasterdata.Version{
-		ID:         v.ID,
-		DisplayID:  v.DisplayID,
-		Name:       v.Name,
-		ShortName:  v.ShortName,
-		ReleasedAt: v.ReleasedAt,
 	}
 }
 
@@ -537,7 +531,12 @@ func (c *Cache) MasterDataMasters() *domainmasterdata.MasterDataMasters {
 	publicVersions := c.PublicVersionsByID()
 	versionsByID := make(map[int]domainmasterdata.Version, len(publicVersions))
 	for k, v := range publicVersions {
-		versionsByID[k] = toDomainVersion(v)
+		versionsByID[k] = domainmasterdata.Version{
+			ID:         v.ID,
+			Name:       v.Name,
+			ShortName:  v.ShortName,
+			ReleasedAt: v.ReleasedAt,
+		}
 	}
 
 	return &domainmasterdata.MasterDataMasters{

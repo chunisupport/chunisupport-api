@@ -1,10 +1,7 @@
 package displayid
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"regexp"
 )
 
@@ -36,14 +33,4 @@ func (d DisplayID) String() string {
 // IsValid はDisplayIDが有効な形式かを確認します
 func (d DisplayID) IsValid() bool {
 	return displayIDPattern.MatchString(string(d))
-}
-
-// Generate はAPI上の id として公開する、DB主キーと独立したランダムなDisplayIDを生成します。
-// 連番を推測されないよう、暗号論的乱数で8バイトを採番します。
-func Generate() (DisplayID, error) {
-	b := make([]byte, 8)
-	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("failed to generate display ID: %w", err)
-	}
-	return DisplayID(hex.EncodeToString(b)), nil
 }
