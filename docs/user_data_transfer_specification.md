@@ -301,8 +301,8 @@ HMAC-SHA256(DATA_TRANSFER_HMAC_SECRET, signing_input)
 | 称号タイプ | タイプ名 | `honor_type_id` |
 | 称号 | 画像URL、または名称とタイプ名 | `honor_id` |
 | achievement type | コード | `achievement_type_id` |
-| 目標ジャンル条件 | ジャンル名 | `genre_id` |
-| 目標バージョン条件 | バージョン名 | `version_id` |
+| 目標ジャンル条件 | ジャンル名 | ジャンル名（`goals.attributes.genre` にそのまま保存） |
+| 目標バージョン条件 | バージョン名 | バージョンの公開ID（`versions.display_id`） |
 
 論理削除済みの楽曲およびコースも照合対象に含める。必要な参照キーはペイロード全体から収集して種類ごとに一括取得し、レコード単位の照合によるN+1を発生させない。
 

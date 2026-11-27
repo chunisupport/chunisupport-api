@@ -924,15 +924,18 @@ type GoalAchievementType =
   | 'overpower_percent';
 
 type GoalAttributes = {
-  diff?: number | number[];
+  /** 難易度名（マスタの difficulties[].name） */
+  diff?: string | string[];
   const?: {
     min: number;
     max: number;
   };
   /** const の入力方法。省略時は 'number' として扱う */
   const_filter_mode?: 'level' | 'number';
-  genre?: number | number[];
-  ver?: number | number[];
+  /** ジャンル名（マスタの genres[].name） */
+  genre?: string | string[];
+  /** バージョンの公開ID（マスタの versions[].id） */
+  ver?: string | string[];
   /** 楽曲名順フォルダのコード（マスタの name_folders[].code） */
   name_folder?: string | string[];
 };
@@ -966,5 +969,5 @@ type GoalsResponse = {
 };
 ```
 
-実際には返却時の `diff` / `genre` / `ver` は、正規化の結果として `number` になることがあります。
-そのため受信側は `number | number[]` として扱うのが安全です。
+実際には返却時の `diff` / `genre` / `ver` は、正規化の結果として単一の `string` になることがあります。
+そのため受信側は `string | string[]` として扱うのが安全です。

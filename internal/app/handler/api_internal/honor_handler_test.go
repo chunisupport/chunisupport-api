@@ -32,6 +32,8 @@ type mockHonorUsecase struct {
 	deleteErr    error
 	createCalled bool
 	deleteCalled bool
+	getCalled    bool
+	updateCalled bool
 }
 
 func (m *mockHonorUsecase) ListHonors(context.Context) ([]*entity.Honor, error) {
@@ -39,6 +41,7 @@ func (m *mockHonorUsecase) ListHonors(context.Context) ([]*entity.Honor, error) 
 }
 
 func (m *mockHonorUsecase) GetHonor(context.Context, displayid.DisplayID) (*entity.Honor, error) {
+	m.getCalled = true
 	return &entity.Honor{ID: 1, DisplayID: "0123456789abcdef", Name: "称号A", TypeName: "gold"}, nil
 }
 
@@ -51,6 +54,7 @@ func (m *mockHonorUsecase) CreateHonor(context.Context, usecase.HonorInput) (*en
 }
 
 func (m *mockHonorUsecase) UpdateHonor(context.Context, displayid.DisplayID, usecase.HonorInput) (*entity.Honor, error) {
+	m.updateCalled = true
 	return &entity.Honor{ID: 1, DisplayID: "0123456789abcdef", Name: "称号A", TypeName: "gold"}, nil
 }
 
@@ -235,6 +239,8 @@ func TestHonorHandler_DBの数値主キーはUsecaseを呼ばずValidationFailed
 
 			// Then
 			assertHonorHandlerAPIError(t, err, apierror.CodeValidationFailed)
+			assert.False(t, uc.getCalled)
+			assert.False(t, uc.updateCalled)
 			assert.False(t, uc.deleteCalled)
 		})
 	}
