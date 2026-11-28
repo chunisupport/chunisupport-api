@@ -51,11 +51,12 @@ ORDER BY starts_at DESC, id DESC
 	return restoreAppAnnouncements(rows)
 }
 
-// FindByDisplayID は主キーで1件を取得します。
-func (r *appAnnouncementRepository) FindByDisplayID(ctx context.Context, displayID displayid.DisplayID) (*entity.AppAnnouncement, error) {
+// FindByDisplayIDForUpdate は revision の読み取りから更新まで対象行をロックします。
+func (r *appAnnouncementRepository) FindByDisplayIDForUpdate(ctx context.Context, exec domainrepo.Executor, displayID displayid.DisplayID) (*entity.AppAnnouncement, error) {
 	var row models.AppAnnouncementModel
-	if err := r.db.GetContext(ctx, &row, selectAppAnnouncementColumns+`
+	if err := exec.GetContext(ctx, &row, selectAppAnnouncementColumns+`
 WHERE id = ?
+FOR UPDATE
 `, displayID.String()); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, domainrepo.ErrAppAnnouncementNotFound
@@ -82,8 +83,8 @@ VALUES (:id, :kind, :title, :body, :target_url, :starts_at, :expires_at, :revisi
 
 // Update はお知らせの内容を上書きします。
 // DSNの clientFoundRows=true により値が変わらない更新でも一致行数が返るため、0件を存在しないと判定します。
-func (r *appAnnouncementRepository) Update(ctx context.Context, announcement *entity.AppAnnouncement) error {
-	result, err := r.db.NamedExecContext(ctx, `
+func (r *appAnnouncementRepository) Update(ctx context.Context, exec domainrepo.Executor, announcement *entity.AppAnnouncement) error {
+	result, err := exec.NamedExecContext(ctx, `
 UPDATE app_announcements
 SET kind = :kind, title = :title, body = :body, target_url = :target_url,
     starts_at = :starts_at, expires_at = :expires_at, revision = :revision

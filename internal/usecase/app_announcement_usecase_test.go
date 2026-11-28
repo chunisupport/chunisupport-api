@@ -31,7 +31,7 @@ func (r *stubAppAnnouncementRepository) FindAll(context.Context) ([]*entity.AppA
 	return r.announcements, r.err
 }
 
-func (r *stubAppAnnouncementRepository) FindByDisplayID(context.Context, displayid.DisplayID) (*entity.AppAnnouncement, error) {
+func (r *stubAppAnnouncementRepository) FindByDisplayIDForUpdate(context.Context, repository.Executor, displayid.DisplayID) (*entity.AppAnnouncement, error) {
 	if r.found == nil {
 		return nil, repository.ErrAppAnnouncementNotFound
 	}
@@ -43,7 +43,7 @@ func (r *stubAppAnnouncementRepository) Create(_ context.Context, announcement *
 	return r.err
 }
 
-func (r *stubAppAnnouncementRepository) Update(_ context.Context, announcement *entity.AppAnnouncement) error {
+func (r *stubAppAnnouncementRepository) Update(_ context.Context, _ repository.Executor, announcement *entity.AppAnnouncement) error {
 	r.saved = announcement
 	return r.err
 }
@@ -142,7 +142,7 @@ func TestAppAnnouncementUsecase_Update(t *testing.T) {
 			current, err := entity.RestoreAppAnnouncement("000000000000000a", "message", "お知らせ", &body, nil, startsAt, startsAt.Add(time.Hour), 3)
 			require.NoError(t, err)
 			repo := &stubAppAnnouncementRepository{found: current}
-			uc := &appAnnouncementUsecase{repo: repo, clock: fixedClock{}}
+			uc := NewAdminAppAnnouncementUsecase(repo, &passthroughTransactionManager{})
 
 			// When
 			got, err := uc.Update(context.Background(), "000000000000000a", input, tt.bumpRevision)
@@ -162,7 +162,7 @@ func TestAppAnnouncementUsecase_Update_存在しないお知らせはエラー(t
 	startsAt := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
 	body := "本文"
 	input := AppAnnouncementInput{Kind: "message", Title: "お知らせ", Body: &body, StartsAt: startsAt, ExpiresAt: startsAt.Add(time.Hour)}
-	uc := &appAnnouncementUsecase{repo: &stubAppAnnouncementRepository{}, clock: fixedClock{}}
+	uc := NewAdminAppAnnouncementUsecase(&stubAppAnnouncementRepository{}, &passthroughTransactionManager{})
 
 	for _, id := range []string{"000000000000000a", "invalid"} {
 		// When

@@ -274,7 +274,7 @@ func buildRouterDependencies(startupCtx, ctx context.Context, db *sqlx.DB, cfg c
 		CourseStats:           api_internal.NewCourseStatsHandler(courseStatsUsecase, chartStatsMasterProvider),
 		SystemMaintenance:     api_internal.NewSystemMaintenanceHandler(systemMaintenanceUsecase),
 		AppAnnouncement:       api_internal.NewAppAnnouncementHandler(usecase.NewAppAnnouncementUsecase(appAnnouncementRepo)),
-		AdminAppAnnouncement:  api_internal.NewAdminAppAnnouncementHandler(usecase.NewAdminAppAnnouncementUsecase(appAnnouncementRepo)),
+		AdminAppAnnouncement:  api_internal.NewAdminAppAnnouncementHandler(usecase.NewAdminAppAnnouncementUsecase(appAnnouncementRepo, tm)),
 		SongBatch:             api_internal.NewSongBatchHandler(songBatchJobUsecase),
 		ChartStatsBatch:       api_internal.NewChartStatsBatchHandler(chartStatsBatchJobUsecase),
 		V1Song:                api_v1.NewV1SongHandler(songUsecase, chartStatsUsecase, masterCache, staticMasterCache),

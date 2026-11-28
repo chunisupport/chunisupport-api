@@ -8,7 +8,9 @@ import (
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	domainrepo "github.com/chunisupport/chunisupport-api/internal/domain/repository"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
+	"github.com/chunisupport/chunisupport-api/internal/infra/transaction"
 	"github.com/chunisupport/chunisupport-api/internal/testutil/mysqltest"
+	"github.com/chunisupport/chunisupport-api/internal/usecase"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,7 +19,7 @@ const insertAppAnnouncementSQL = `
 INSERT INTO app_announcements (id, kind, title, body, target_url, starts_at, expires_at, revision)
 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 
-func TestAppAnnouncementRepository_FindUnexpired(t *testing.T) {
+func TestAppAnnouncementRepositoryMySQL_FindUnexpired(t *testing.T) {
 	// Given
 	db := mysqltest.NewDatabase(t, "")
 	now := time.Date(2026, 12, 1, 12, 0, 0, 0, time.UTC)
@@ -49,7 +51,7 @@ func TestAppAnnouncementRepository_FindUnexpired(t *testing.T) {
 	assert.Equal(t, now.Add(-time.Hour), got[1].StartsAt)
 }
 
-func TestAppAnnouncementRepository_FindUnexpired_不正な行はエラーにする(t *testing.T) {
+func TestAppAnnouncementRepositoryMySQL_FindUnexpired_不正な行はエラーにする(t *testing.T) {
 	// Given: 開始前の行も検証し、登録直後に誤りへ気付けるようにする
 	db := mysqltest.NewDatabase(t, "")
 	now := time.Date(2026, 12, 1, 12, 0, 0, 0, time.UTC)
@@ -64,7 +66,7 @@ func TestAppAnnouncementRepository_FindUnexpired_不正な行はエラーにす�
 	assert.ErrorIs(t, err, entity.ErrAppAnnouncementKindInvalid)
 }
 
-func TestAppAnnouncementsMigration_不正な期間とリビジョンを拒否する(t *testing.T) {
+func TestAppAnnouncementsMigrationMySQL_不正な期間とリビジョンを拒否する(t *testing.T) {
 	db := mysqltest.NewDatabase(t, "")
 	startsAt := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
 	body := "本文"
@@ -89,7 +91,7 @@ func TestAppAnnouncementsMigration_不正な期間とリビジョンを拒否す
 	}
 }
 
-func TestAppAnnouncementRepository_管理操作(t *testing.T) {
+func TestAppAnnouncementRepositoryMySQL_管理操作(t *testing.T) {
 	// Given
 	db := mysqltest.NewDatabase(t, "")
 	repo := NewAppAnnouncementRepository(db)
@@ -118,9 +120,19 @@ func TestAppAnnouncementRepository_管理操作(t *testing.T) {
 	// When: 種別を変えて上書きする
 	updated, err := entity.RestoreAppAnnouncement("000000000000000b", "message", "改訂", &body, nil, startsAt, startsAt.Add(2*time.Hour), 2)
 	require.NoError(t, err)
-	require.NoError(t, repo.Update(ctx, updated))
-	require.NoError(t, repo.Update(ctx, updated))
-	got, err := repo.FindByDisplayID(ctx, updated.DisplayID)
+	tm := transaction.NewTransactionManager(db)
+	var got *entity.AppAnnouncement
+	err = tm.Transactional(ctx, func(tx domainrepo.Executor) error {
+		if err := repo.Update(ctx, tx, updated); err != nil {
+			return err
+		}
+		if err := repo.Update(ctx, tx, updated); err != nil {
+			return err
+		}
+		var err error
+		got, err = repo.FindByDisplayIDForUpdate(ctx, tx, updated.DisplayID)
+		return err
+	})
 
 	// Then: 値が変わらない2回目の上書きも成功し、内容が置き換わる
 	require.NoError(t, err)
@@ -131,11 +143,73 @@ func TestAppAnnouncementRepository_管理操作(t *testing.T) {
 
 	// When & Then: 削除後は見つからない
 	require.NoError(t, repo.Delete(ctx, updated.DisplayID))
-	_, err = repo.FindByDisplayID(ctx, updated.DisplayID)
-	assert.ErrorIs(t, err, domainrepo.ErrAppAnnouncementNotFound)
+	assert.ErrorIs(t, tm.Transactional(ctx, func(tx domainrepo.Executor) error {
+		_, err := repo.FindByDisplayIDForUpdate(ctx, tx, updated.DisplayID)
+		return err
+	}), domainrepo.ErrAppAnnouncementNotFound)
 	assert.ErrorIs(t, repo.Delete(ctx, updated.DisplayID), domainrepo.ErrAppAnnouncementNotFound)
 	missing := displayid.DisplayID("00000000000000ff")
 	missingAnnouncement, err := entity.RestoreAppAnnouncement(missing.String(), "message", "なし", &body, nil, startsAt, startsAt.Add(time.Hour), 1)
 	require.NoError(t, err)
-	assert.ErrorIs(t, repo.Update(ctx, missingAnnouncement), domainrepo.ErrAppAnnouncementNotFound)
+	assert.ErrorIs(t, tm.Transactional(ctx, func(tx domainrepo.Executor) error {
+		return repo.Update(ctx, tx, missingAnnouncement)
+	}), domainrepo.ErrAppAnnouncementNotFound)
+}
+
+func TestAppAnnouncementRepositoryMySQL_並行更新でリビジョンを保持する(t *testing.T) {
+	db := mysqltest.NewDatabase(t, "")
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	startsAt := time.Date(2026, 12, 1, 0, 0, 0, 0, time.UTC)
+	body := "本文"
+	input := usecase.AppAnnouncementInput{Kind: "message", Title: "お知らせ", Body: &body, StartsAt: startsAt, ExpiresAt: startsAt.Add(time.Hour)}
+	uc := usecase.NewAdminAppAnnouncementUsecase(NewAppAnnouncementRepository(db), transaction.NewTransactionManager(db))
+	created, err := uc.Create(ctx, input)
+	require.NoError(t, err)
+
+	firstUpdate, err := db.BeginTxx(ctx, nil)
+	require.NoError(t, err)
+	defer firstUpdate.Rollback()
+	_, err = firstUpdate.ExecContext(ctx, "UPDATE app_announcements SET revision = revision + 1 WHERE id = ?", created.DisplayID.String())
+	require.NoError(t, err)
+
+	type updateResult struct {
+		announcement *entity.AppAnnouncement
+		err          error
+	}
+	updated := make(chan updateResult, 1)
+	input.Title = "編集後"
+	go func() {
+		announcement, err := uc.Update(ctx, created.DisplayID.String(), input, false)
+		updated <- updateResult{announcement: announcement, err: err}
+	}()
+
+	require.EventuallyWithT(t, func(collect *assert.CollectT) {
+		var waiting bool
+		err := db.GetContext(ctx, &waiting, `SELECT EXISTS (
+			SELECT 1 FROM performance_schema.data_lock_waits AS waits
+			INNER JOIN performance_schema.data_locks AS locks ON waits.REQUESTING_ENGINE_LOCK_ID = locks.ENGINE_LOCK_ID
+			WHERE locks.OBJECT_SCHEMA = DATABASE() AND locks.OBJECT_NAME = 'app_announcements'
+		)`)
+		if assert.NoError(collect, err) {
+			assert.True(collect, waiting)
+		}
+	}, 8*time.Second, 20*time.Millisecond)
+	require.NoError(t, firstUpdate.Commit())
+
+	select {
+	case result := <-updated:
+		require.NoError(t, result.err)
+		require.NotNil(t, result.announcement)
+		assert.Equal(t, 2, result.announcement.Revision)
+		assert.Equal(t, "編集後", result.announcement.Title)
+	case <-ctx.Done():
+		require.NoError(t, ctx.Err())
+	}
+
+	all, err := uc.ListAll(ctx)
+	require.NoError(t, err)
+	require.Len(t, all, 1)
+	assert.Equal(t, 2, all[0].Revision)
 }

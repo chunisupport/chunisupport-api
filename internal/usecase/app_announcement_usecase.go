@@ -36,6 +36,7 @@ type AdminAppAnnouncementUsecase interface {
 
 type appAnnouncementUsecase struct {
 	repo  repository.AppAnnouncementRepository
+	tm    TransactionManager
 	clock clock
 }
 
@@ -45,8 +46,8 @@ func NewAppAnnouncementUsecase(repo repository.AppAnnouncementRepository) AppAnn
 }
 
 // NewAdminAppAnnouncementUsecase はADMIN専用のお知らせ管理ユースケースを生成します。
-func NewAdminAppAnnouncementUsecase(repo repository.AppAnnouncementRepository) AdminAppAnnouncementUsecase {
-	return &appAnnouncementUsecase{repo: repo, clock: systemClock{}}
+func NewAdminAppAnnouncementUsecase(repo repository.AppAnnouncementRepository, tm TransactionManager) AdminAppAnnouncementUsecase {
+	return &appAnnouncementUsecase{repo: repo, tm: tm}
 }
 
 // ListActive は配信有効かつ表示期間内のお知らせを、開始日時の新しい順に返します。
@@ -92,19 +93,23 @@ func (u *appAnnouncementUsecase) Update(ctx context.Context, id string, input Ap
 	if err != nil {
 		return nil, err
 	}
-	current, err := u.repo.FindByDisplayID(ctx, displayID)
+	var announcement *entity.AppAnnouncement
+	err = u.tm.Transactional(ctx, func(tx repository.Executor) error {
+		current, err := u.repo.FindByDisplayIDForUpdate(ctx, tx, displayID)
+		if err != nil {
+			return err
+		}
+		revision := current.Revision
+		if bumpRevision {
+			revision++
+		}
+		announcement, err = restoreAppAnnouncementInput(displayID.String(), input, revision)
+		if err != nil {
+			return err
+		}
+		return u.repo.Update(ctx, tx, announcement)
+	})
 	if err != nil {
-		return nil, err
-	}
-	revision := current.Revision
-	if bumpRevision {
-		revision++
-	}
-	announcement, err := restoreAppAnnouncementInput(displayID.String(), input, revision)
-	if err != nil {
-		return nil, err
-	}
-	if err := u.repo.Update(ctx, announcement); err != nil {
 		return nil, err
 	}
 	return announcement, nil
