@@ -39,6 +39,7 @@ type CourseRepository interface {
 	FindTrackCandidates(ctx context.Context, exec Executor, courseID int, tracks []entity.CourseTrack) (map[int][]entity.CourseChartCandidate, error)
 	ReplaceTracks(ctx context.Context, exec Executor, course *entity.Course) error
 	FindRecordsByPlayerID(ctx context.Context, exec Executor, playerID int, includeDeleted bool) ([]*entity.PlayerCourseRecord, error)
+	FindRecordByPlayerIDAndDisplayID(ctx context.Context, exec Executor, playerID int, displayID string) (*entity.PlayerCourseRecord, error)
 	FindRecordStatesByCourseIDs(ctx context.Context, exec Executor, playerID int, courseIDs []int) (map[int]CourseRecordState, error)
 	UpsertRecords(ctx context.Context, exec Executor, records []CourseRecordForUpsert) error
 }

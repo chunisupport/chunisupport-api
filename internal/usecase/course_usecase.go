@@ -298,16 +298,25 @@ func newerTimePtr(a, b *time.Time) *time.Time {
 }
 
 func (u *courseUsecase) GetUserRecord(ctx context.Context, username string, requester *entity.User, displayID string) (*CourseRecordOutput, error) {
-	result, err := u.GetUserRecords(ctx, username, requester)
+	user, err := getAccessibleUser(ctx, u.db, u.userRepo, u.friendshipRepo, username, requester)
 	if err != nil {
 		return nil, err
 	}
-	for _, record := range result.Records {
-		if record.DisplayID == displayID {
-			return record, nil
-		}
+	if user.PlayerID == nil {
+		return nil, ErrCourseNotFound
 	}
-	return nil, ErrCourseNotFound
+	id, err := displayid.NewDisplayID(displayID)
+	if err != nil {
+		return nil, ErrCourseNotFound
+	}
+	record, err := u.repo.FindRecordByPlayerIDAndDisplayID(ctx, u.db, *user.PlayerID, id.String())
+	if errors.Is(err, repository.ErrCourseNotFound) {
+		return nil, ErrCourseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return toCourseRecordOutputWithTopPercent(record, loadScorePercentiles(ctx, u.scorePercentiles)), nil
 }
 
 func toCourseOutput(course *entity.Course, editor bool) *CourseOutput {

@@ -182,13 +182,15 @@ func (r *courseRepository) Save(ctx context.Context, exec domainrepo.Executor, c
 	return nil
 }
 
+const selectCourseRecords = `SELECT COALESCE(pcr.player_id, ?) player_id, c.id course_id, COALESCE(pcr.score,0) score, COALESCE(pcr.is_clear,FALSE) is_clear, COALESCE(pcr.combo_lamp_id,1) combo_lamp_id, pcr.updated_at,
+	c.display_id, c.official_idx, c.name course_name, c.course_class_id, cc.name course_class_name, cc.sort_order course_class_sort_order, cl.name combo_lamp_name
+	FROM courses c INNER JOIN course_classes cc ON cc.id=c.course_class_id LEFT JOIN player_course_records pcr ON pcr.course_id=c.id AND pcr.player_id=? LEFT JOIN combo_lamp_types cl ON cl.id=pcr.combo_lamp_id`
+
 func (r *courseRepository) FindRecordsByPlayerID(ctx context.Context, exec domainrepo.Executor, playerID int, includeDeleted bool) ([]*entity.PlayerCourseRecord, error) {
 	if exec == nil {
 		exec = r.db
 	}
-	query := `SELECT COALESCE(pcr.player_id, ?) player_id, c.id course_id, COALESCE(pcr.score,0) score, COALESCE(pcr.is_clear,FALSE) is_clear, COALESCE(pcr.combo_lamp_id,1) combo_lamp_id, pcr.updated_at,
-	c.display_id, c.official_idx, c.name course_name, c.course_class_id, cc.name course_class_name, cc.sort_order course_class_sort_order, cl.name combo_lamp_name
-	FROM courses c INNER JOIN course_classes cc ON cc.id=c.course_class_id LEFT JOIN player_course_records pcr ON pcr.course_id=c.id AND pcr.player_id=? LEFT JOIN combo_lamp_types cl ON cl.id=pcr.combo_lamp_id`
+	query := selectCourseRecords
 	if !includeDeleted {
 		query += ` WHERE c.is_deleted=FALSE`
 	}
@@ -206,6 +208,26 @@ func (r *courseRepository) FindRecordsByPlayerID(ctx context.Context, exec domai
 		result = append(result, record)
 	}
 	return result, nil
+}
+
+// FindRecordByPlayerIDAndDisplayID は未プレイのコースも返すため、一覧と同じ結合を使います。
+func (r *courseRepository) FindRecordByPlayerIDAndDisplayID(ctx context.Context, exec domainrepo.Executor, playerID int, displayID string) (*entity.PlayerCourseRecord, error) {
+	if exec == nil {
+		exec = r.db
+	}
+	const query = selectCourseRecords + ` WHERE c.display_id = ? AND c.is_deleted = FALSE`
+	var row models.PlayerCourseRecordModel
+	if err := exec.GetContext(ctx, &row, query, playerID, playerID, displayID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, domainrepo.ErrCourseNotFound
+		}
+		return nil, fmt.Errorf("failed to find course record: %w", err)
+	}
+	record, err := row.ToEntity()
+	if err != nil {
+		return nil, fmt.Errorf("failed to restore course record: %w", err)
+	}
+	return record, nil
 }
 
 func (r *courseRepository) FindRecordStatesByCourseIDs(ctx context.Context, exec domainrepo.Executor, playerID int, ids []int) (map[int]domainrepo.CourseRecordState, error) {

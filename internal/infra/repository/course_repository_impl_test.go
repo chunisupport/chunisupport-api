@@ -85,6 +85,40 @@ func TestCourseRepository_FindRecordsByPlayerID_未プレイを補完する(t *t
 	assert.True(t, records[1].UpdatedAt.IsZero())
 }
 
+func TestCourseRepository_FindRecordByPlayerIDAndDisplayID(t *testing.T) {
+	repo := setupCourseRepositoryDB(t)
+	tests := []struct {
+		name       string
+		playerID   int
+		displayID  string
+		wantScore  uint32
+		wantPlayed bool
+		wantErr    error
+	}{
+		{name: "対象プレイヤーの記録", playerID: 100, displayID: "0000000000000010", wantScore: 3023238, wantPlayed: true},
+		{name: "未プレイならコース情報を返す", playerID: 101, displayID: "0000000000000010"},
+		{name: "削除済みコース", playerID: 100, displayID: "0000000000000011", wantErr: domainrepo.ErrCourseNotFound},
+		{name: "存在しないコース", playerID: 100, displayID: "ffffffffffffffff", wantErr: domainrepo.ErrCourseNotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			record, err := repo.FindRecordByPlayerIDAndDisplayID(context.Background(), repo.db, tt.playerID, tt.displayID)
+
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, record)
+			require.NotNil(t, record.Course)
+			assert.Equal(t, tt.displayID, record.Course.DisplayID.String())
+			assert.Equal(t, tt.playerID, record.PlayerID)
+			assert.Equal(t, tt.wantScore, record.Score.Uint32())
+			assert.Equal(t, tt.wantPlayed, !record.UpdatedAt.IsZero())
+		})
+	}
+}
+
 func TestCourseRepository_FindLatestUpdatedAt_最大値を返す(t *testing.T) {
 	// Given
 	repo := setupCourseRepositoryDB(t)

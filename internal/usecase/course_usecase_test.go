@@ -7,6 +7,8 @@ import (
 
 	"github.com/chunisupport/chunisupport-api/internal/domain/entity"
 	"github.com/chunisupport/chunisupport-api/internal/domain/repository"
+	"github.com/chunisupport/chunisupport-api/internal/domain/scorepercentile"
+	"github.com/chunisupport/chunisupport-api/internal/domain/vo/coursescore"
 	"github.com/chunisupport/chunisupport-api/internal/domain/vo/displayid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,6 +21,8 @@ type courseRepositoryStub struct {
 	saved             *entity.Course
 	records           []*entity.PlayerCourseRecord
 	latestUpdatedAt   *time.Time
+	listRecordCalls   int
+	recordPlayerID    int
 }
 
 func (s *courseRepositoryStub) FindAll(context.Context, repository.Executor, bool) ([]*entity.Course, error) {
@@ -59,7 +63,19 @@ func (s *courseRepositoryStub) Save(_ context.Context, _ repository.Executor, co
 	return nil
 }
 func (s *courseRepositoryStub) FindRecordsByPlayerID(context.Context, repository.Executor, int, bool) ([]*entity.PlayerCourseRecord, error) {
+	s.listRecordCalls++
 	return s.records, nil
+}
+
+func (s *courseRepositoryStub) FindRecordByPlayerIDAndDisplayID(_ context.Context, _ repository.Executor, playerID int, displayID string) (*entity.PlayerCourseRecord, error) {
+	s.searchedDisplayID = displayID
+	s.recordPlayerID = playerID
+	for _, record := range s.records {
+		if record.Course.DisplayID.String() == displayID {
+			return record, nil
+		}
+	}
+	return nil, repository.ErrCourseNotFound
 }
 
 func (s *courseRepositoryStub) FindTracks(context.Context, repository.Executor, []int) (map[int][]entity.CourseTrack, error) {
@@ -199,6 +215,61 @@ func TestCourseUsecase_GetUserRecord_DisplayIDで対象レコードを選ぶ(t *
 	require.NoError(t, err)
 	assert.Equal(t, displayID.String(), output.DisplayID)
 	assert.Equal(t, "対象コース", output.Name)
+	assert.False(t, output.IsPlayed)
+	assert.Nil(t, output.TopPercent)
+	assert.Equal(t, displayID.String(), repo.searchedDisplayID)
+	assert.Equal(t, playerID, repo.recordPlayerID)
+	assert.Zero(t, repo.listRecordCalls)
+}
+
+func TestCourseUsecase_GetUserRecord_プレイ済みの上位パーセントを返す(t *testing.T) {
+	id, err := displayid.NewDisplayID("0123456789abcdef")
+	require.NoError(t, err)
+	score, err := coursescore.New(2000000)
+	require.NoError(t, err)
+	playerID := 10
+	repo := &courseRepositoryStub{records: []*entity.PlayerCourseRecord{{
+		CourseID: 30, Course: &entity.Course{DisplayID: id}, Score: score, UpdatedAt: time.Now(),
+	}}}
+	userRepo := &courseUserRepositoryStub{user: &entity.User{PlayerID: &playerID}}
+	provider := &fakeScorePercentileProvider{snapshot: scorepercentile.NewSnapshot(1, nil, nil,
+		[]scorepercentile.Entry{{TargetID: 30, Thresholds: scorepercentile.BuildThresholds([]int{3030000, 2000000})}},
+	)}
+	uc := NewCourseUsecase(nil, nil, repo, userRepo, nil, provider)
+
+	output, err := uc.GetUserRecord(context.Background(), "player", nil, id.String())
+
+	require.NoError(t, err)
+	assert.True(t, output.IsPlayed)
+	require.NotNil(t, output.TopPercent)
+	assert.Equal(t, 100.0, *output.TopPercent)
+}
+
+func TestCourseUsecase_GetUserRecord_取得できない場合のエラー(t *testing.T) {
+	playerID := 10
+	tests := []struct {
+		name       string
+		user       *entity.User
+		wantErr    error
+		searchedID string
+	}{
+		{name: "連携済みで対象コースが見つからない", user: &entity.User{PlayerID: &playerID}, wantErr: ErrCourseNotFound, searchedID: "0123456789abcdef"},
+		{name: "プレイヤー未連携", user: &entity.User{}, wantErr: ErrCourseNotFound},
+		{name: "非公開ユーザーを未認証で参照", user: &entity.User{PlayerID: &playerID, IsPrivate: true}, wantErr: ErrUserPrivate},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &courseRepositoryStub{}
+			userRepo := &courseUserRepositoryStub{user: tt.user}
+			uc := NewCourseUsecase(nil, nil, repo, userRepo, nil, nil)
+
+			_, err := uc.GetUserRecord(context.Background(), "player", nil, "0123456789abcdef")
+
+			assert.ErrorIs(t, err, tt.wantErr)
+			assert.Equal(t, tt.searchedID, repo.searchedDisplayID)
+			assert.Zero(t, repo.listRecordCalls)
+		})
+	}
 }
 
 func TestCourseUsecase_GetUserRecords_metaUpdatedAtがマスタとレコードの新しい方になる(t *testing.T) {
